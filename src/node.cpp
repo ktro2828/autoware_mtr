@@ -236,11 +236,18 @@ TrackedObject MTRNode::makeEgoTrackedObject(const Odometry::ConstSharedPtr ego_m
   }
   // Shape
   {
-    const auto & ego_max_long_offset = vehicle_info_.max_longitudinal_offset_m;
-    const auto & ego_rear_overhang = vehicle_info_.vehicle_height_m;
-    const auto & ego_length = vehicle_info_.vehicle_length_m;
-    const auto & ego_width = vehicle_info_.vehicle_width_m;
-    const auto & ego_height = vehicle_info_.vehicle_height_m;
+    //   While the module is not merged to autoware universe, it is hard to use vehicle utils
+    //   const auto & ego_max_long_offset = vehicle_info_.max_longitudinal_offset_m;
+    //   const auto & ego_rear_overhang = vehicle_info_.vehicle_height_m;
+    //   const auto & ego_length = vehicle_info_.vehicle_length_m;
+    //   const auto & ego_width = vehicle_info_.vehicle_width_m;
+    //   const auto & ego_height = vehicle_info_.vehicle_height_m;
+
+    const auto & ego_max_long_offset = EGO_LENGTH - EGO_REAR_OVERHANG;
+    const auto & ego_rear_overhang = EGO_REAR_OVERHANG;
+    const auto & ego_length = EGO_LENGTH;
+    const auto & ego_width = EGO_WIDTH;
+    const auto & ego_height = EGO_HEIGHT;
 
     autoware_perception_msgs::msg::Shape shape;
     shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
@@ -376,9 +383,14 @@ bool MTRNode::fetchData()
     ay = static_cast<float>(twist.linear.y) - latest_state.second.vy() / (time_diff + 1e-10f);
   }
 
-  const auto & ego_length = vehicle_info_.vehicle_length_m;
-  const auto & ego_width = vehicle_info_.vehicle_width_m;
-  const auto & ego_height = vehicle_info_.vehicle_height_m;
+  //   While the module is not merged to autoware universe, it is hard to use vehicle utils
+  // const auto & ego_length = vehicle_info_.vehicle_length_m;
+  // const auto & ego_width = vehicle_info_.vehicle_width_m;
+  // const auto & ego_height = vehicle_info_.vehicle_height_m;
+
+  const auto & ego_length = EGO_LENGTH;
+  const auto & ego_width = EGO_WIDTH;
+  const auto & ego_height = EGO_HEIGHT;
 
   ego_states_.emplace_back(
     current_time,

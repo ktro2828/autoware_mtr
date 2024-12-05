@@ -61,6 +61,12 @@ using autoware_perception_msgs::msg::TrackedObject;
 using autoware_perception_msgs::msg::TrackedObjects;
 using nav_msgs::msg::Odometry;
 
+// While this is no merged to Autoware, it is hard to use Vehicle Info Utils
+constexpr float EGO_LENGTH = 4.0f;
+constexpr float EGO_WIDTH = 2.0f;
+constexpr float EGO_HEIGHT = 1.0f;
+constexpr float EGO_REAR_OVERHANG = 1.1f;
+
 class PolylineTypeMap
 {
 public:
