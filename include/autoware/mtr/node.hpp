@@ -15,10 +15,10 @@
 #ifndef AUTOWARE__TENSORRT_MTR__NODE_HPP_
 #define AUTOWARE__TENSORRT_MTR__NODE_HPP_
 
-#include "autoware/tensorrt_mtr/agent.hpp"
-#include "autoware/tensorrt_mtr/polyline.hpp"
-#include "autoware/tensorrt_mtr/trajectory.hpp"
-#include "autoware/tensorrt_mtr/trt_mtr.hpp"
+#include "autoware/mtr/agent.hpp"
+#include "autoware/mtr/polyline.hpp"
+#include "autoware/mtr/trajectory.hpp"
+#include "autoware/mtr/trt_mtr.hpp"
 
 #include <autoware/object_recognition_utils/object_classification.hpp>
 #include <autoware/universe_utils/geometry/geometry.hpp>
@@ -48,7 +48,7 @@
 #include <utility>
 #include <vector>
 
-namespace autoware::trt_mtr
+namespace autoware::mtr
 {
 using HADMapBin = autoware_map_msgs::msg::LaneletMapBin;
 using autoware::vehicle_info_utils::VehicleInfo;
