@@ -4,6 +4,7 @@ build/
 bin/
 msg_gen/
 srv_gen/
+data/*onnx
 msg/*Action.msg
 msg/*ActionFeedback.msg
 msg/*ActionGoal.msg
