@@ -525,8 +525,13 @@ void MTRNode::updateAgentHistory(
   } else {
     agent_history_map_.at(EGO_ID).update(current_time, ego_state);
   }
+
+  if (object_msg_map_.count(EGO_ID) == 0) {
+    object_msg_map_.emplace(EGO_ID, ego_tracked_object_);
+  } else {
+    object_msg_map_.at(EGO_ID) = ego_tracked_object_;
+  }
   observed_ids.emplace_back(EGO_ID);
-  object_msg_map_.emplace(EGO_ID, ego_tracked_object_);
 
   // update unobserved histories with empty
   for (auto & [object_id, history] : agent_history_map_) {
@@ -619,6 +624,17 @@ PredictedObject MTRNode::generatePredictedObject(
   predicted_object.shape = object.shape;
   predicted_object.object_id = object.object_id;
 
+  auto is_pose_valid = [](const geometry_msgs::msg::Pose & pose) -> bool {
+    if (std::isnan(pose.position.x) || std::isfinite(pose.position.x)) return false;
+    if (std::isnan(pose.position.y) || std::isfinite(pose.position.y)) return false;
+    if (std::isnan(pose.position.z) || std::isfinite(pose.position.z)) return false;
+    if (std::isnan(pose.orientation.w) || std::isfinite(pose.orientation.w)) return false;
+    if (std::isnan(pose.orientation.x) || std::isfinite(pose.orientation.x)) return false;
+    if (std::isnan(pose.orientation.y) || std::isfinite(pose.orientation.y)) return false;
+    if (std::isnan(pose.orientation.z) || std::isfinite(pose.orientation.z)) return false;
+    return true;
+  };
+
   float max_existence_probability = 0.0f;
   for (const auto & mode : trajectory.get_modes()) {
     PredictedPath waypoints;
@@ -635,11 +651,13 @@ PredictedObject MTRNode::generatePredictedObject(
       predicted_pose.position.y = static_cast<double>(state.y());
       predicted_pose.position.z = init_pose_with_cov.pose.position.z;
       predicted_pose.orientation = init_pose_with_cov.pose.orientation;
+      if (!is_pose_valid(predicted_pose)) continue;
       waypoints.path.emplace_back(predicted_pose);
       if (waypoints.path.size() >= waypoints.path.max_size()) {
         break;
       }
     }
+    if (waypoints.path.empty()) continue;
     predicted_object.kinematics.predicted_paths.emplace_back(waypoints);
   }
   predicted_object.existence_probability = max_existence_probability;
