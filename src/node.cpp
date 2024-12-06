@@ -283,7 +283,7 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
     return;  // Not enough timestamps
   }
   if (config_ptr_->num_past < timestamps_.size()) {
-    timestamps_.erase(timestamps_.begin(), timestamps_.begin());
+    timestamps_.erase(timestamps_.begin(), timestamps_.begin() + 1);
   }
 
   removeAncientAgentHistory(current_time, object_msg);
