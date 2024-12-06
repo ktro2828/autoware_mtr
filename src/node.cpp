@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 namespace autoware::mtr
 {
@@ -637,13 +638,13 @@ PredictedObject MTRNode::generatePredictedObject(
   predicted_object.object_id = object.object_id;
 
   auto is_pose_valid = [](const geometry_msgs::msg::Pose & pose) -> bool {
-    if (std::isnan(pose.position.x) || std::isfinite(pose.position.x)) return false;
-    if (std::isnan(pose.position.y) || std::isfinite(pose.position.y)) return false;
-    if (std::isnan(pose.position.z) || std::isfinite(pose.position.z)) return false;
-    if (std::isnan(pose.orientation.w) || std::isfinite(pose.orientation.w)) return false;
-    if (std::isnan(pose.orientation.x) || std::isfinite(pose.orientation.x)) return false;
-    if (std::isnan(pose.orientation.y) || std::isfinite(pose.orientation.y)) return false;
-    if (std::isnan(pose.orientation.z) || std::isfinite(pose.orientation.z)) return false;
+    if (std::isnan(pose.position.x) || !std::isfinite(pose.position.x)) return false;
+    if (std::isnan(pose.position.y) || !std::isfinite(pose.position.y)) return false;
+    if (std::isnan(pose.position.z) || !std::isfinite(pose.position.z)) return false;
+    if (std::isnan(pose.orientation.w) || !std::isfinite(pose.orientation.w)) return false;
+    if (std::isnan(pose.orientation.x) || !std::isfinite(pose.orientation.x)) return false;
+    if (std::isnan(pose.orientation.y) || !std::isfinite(pose.orientation.y)) return false;
+    if (std::isnan(pose.orientation.z) || !std::isfinite(pose.orientation.z)) return false;
     return true;
   };
 
