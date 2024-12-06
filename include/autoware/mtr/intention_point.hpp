@@ -24,7 +24,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace autoware::trt_mtr
+namespace autoware::mtr
 {
 
 constexpr size_t IntentionPointDim = 2;

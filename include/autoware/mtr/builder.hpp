@@ -30,7 +30,7 @@ namespace fs = ::std::filesystem;
 #include <sstream>
 #include <string>
 
-namespace autoware::trt_mtr
+namespace autoware::mtr
 {
 
 template <typename T>

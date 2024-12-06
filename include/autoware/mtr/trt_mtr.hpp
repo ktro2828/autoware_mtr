@@ -17,12 +17,12 @@
 
 #include "attention/trt_attn_value_computation.hpp"
 #include "attention/trt_attn_weight_computation.hpp"
-#include "autoware/tensorrt_mtr/agent.hpp"
-#include "autoware/tensorrt_mtr/builder.hpp"
-#include "autoware/tensorrt_mtr/cuda_helper.hpp"
-#include "autoware/tensorrt_mtr/intention_point.hpp"
-#include "autoware/tensorrt_mtr/polyline.hpp"
-#include "autoware/tensorrt_mtr/trajectory.hpp"
+#include "autoware/mtr/agent.hpp"
+#include "autoware/mtr/builder.hpp"
+#include "autoware/mtr/cuda_helper.hpp"
+#include "autoware/mtr/intention_point.hpp"
+#include "autoware/mtr/polyline.hpp"
+#include "autoware/mtr/trajectory.hpp"
 #include "knn/trt_knn_batch.hpp"
 #include "knn/trt_knn_batch_mlogk_kernel.hpp"
 
@@ -32,7 +32,7 @@
 #include <utility>
 #include <vector>
 
-namespace autoware::trt_mtr
+namespace autoware::mtr
 {
 /**
  * @brief A configuration of MTR.

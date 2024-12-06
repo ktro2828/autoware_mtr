@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "autoware/tensorrt_mtr/trt_mtr.hpp"
+#include "autoware/mtr/trt_mtr.hpp"
 
 #include "postprocess/postprocess_kernel.cuh"
 #include "preprocess/agent_preprocess_kernel.cuh"
 #include "preprocess/polyline_preprocess_kernel.cuh"
 
-namespace autoware::trt_mtr
+namespace autoware::mtr
 {
 TrtMTR::TrtMTR(
   const std::string & model_path, const MTRConfig & config, const BuildConfig & build_config,
