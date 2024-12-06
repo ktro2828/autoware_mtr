@@ -676,7 +676,7 @@ PredictedObject MTRNode::generatePredictedObject(
 
   return predicted_object;
 }
-}  // namespace autoware::trt_mtr
+}  // namespace autoware::mtr
 
 #include <rclcpp_components/register_node_macro.hpp>
 RCLCPP_COMPONENTS_REGISTER_NODE(autoware::mtr::MTRNode);
