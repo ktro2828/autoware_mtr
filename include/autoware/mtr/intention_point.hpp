@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef AUTOWARE__TENSORRT_MTR__INTENTION_POINT_HPP_
-#define AUTOWARE__TENSORRT_MTR__INTENTION_POINT_HPP_
+#ifndef AUTOWARE__MTR__INTENTION_POINT_HPP_
+#define AUTOWARE__MTR__INTENTION_POINT_HPP_
 
 #include <cassert>
 #include <fstream>
@@ -117,5 +117,5 @@ private:
   std::unordered_map<std::string, std::vector<float>> data_map_;
   size_t num_cluster_;
 };
-}  // namespace autoware::trt_mtr
-#endif  // AUTOWARE__TENSORRT_MTR__INTENTION_POINT_HPP_
+}  // namespace autoware::mtr
+#endif  // AUTOWARE__MTR__INTENTION_POINT_HPP_
