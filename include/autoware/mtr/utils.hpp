@@ -14,6 +14,7 @@
 #ifndef AUTOWARE__MTR__UTILS_HPP_
 #define AUTOWARE__MTR__UTILS_HPP_
 
+#include "autoware/mtr/agent.hpp"
 #include "autoware/mtr/node.hpp"
 
 #include <lanelet2_extension/utility/message_conversion.hpp>
@@ -28,9 +29,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <iostream>
 #include <string>
 #include <vector>
+
 namespace autoware::mtr::utils
 {
 
@@ -48,6 +51,42 @@ inline void print_data(const float * data, const std::string & obj_name)
   }
   std::cerr << "-----------------\n";
 };
+
+inline void print_agent_data(const AgentData & agent_data)
+{
+  std::cerr << "num agents " << agent_data.num_agent() << "\n";
+  std::cerr << "num targets " << agent_data.num_target() << "\n";
+  std::cerr << "time_length_ " << agent_data.time_length() << "\n";
+  std::cerr << "sdc_index_ " << agent_data.sdc_index() << "\n";
+  std::cerr << "target index(" << agent_data.target_index().size() << "): ";
+  for (const auto target : agent_data.target_index()) {
+    std::cerr << target << ",";
+  }
+  std::cerr << "\n";
+
+  std::cerr << "label index(" << agent_data.label_index().size() << "): ";
+  for (const auto label : agent_data.label_index()) {
+    std::cerr << label << ",";
+  }
+  std::cerr << "\n";
+  std::cerr << "timestamps(" << agent_data.timestamps().size() << "): ";
+  for (const auto timestamps : agent_data.timestamps()) {
+    std::cerr << timestamps << ",";
+  }
+  std::cerr << "\n";
+
+  const auto & d = agent_data.state_dim();
+  const auto target_data_ptr = agent_data.target_data_ptr();
+
+  for (const auto & idx : agent_data.target_index()) {
+    std::cerr << "data of target idx " << idx << ":\n";
+    // Compute the starting address of the n-th object's data
+    auto object_data = new float[d];
+    const float * object_start = target_data_ptr + (idx * d);
+    std::memcpy(object_data, object_start, d * sizeof(float));
+    print_data(object_data, "some object");
+  }
+}
 
 }  // namespace autoware::mtr::utils
 

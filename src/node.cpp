@@ -14,6 +14,8 @@
 
 #include "autoware/mtr/node.hpp"
 
+#include "autoware/mtr/utils.hpp"
+
 #include <lanelet2_extension/utility/message_conversion.hpp>
 
 #include <geometry_msgs/msg/detail/pose__struct.hpp>
@@ -27,6 +29,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <vector>
 
 namespace autoware::mtr
 {
@@ -282,8 +285,8 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
     return;
   }
 
-  const auto current_time = static_cast<float>(rclcpp::Time(object_msg->header.stamp).seconds());
-
+  const auto current_time = rclcpp::Time(object_msg->header.stamp).seconds();
+  std::cerr << "Current time " << current_time << "\n";
   timestamps_.emplace_back(current_time);
   // TODO(ktro2828): update timestamps
   if (timestamps_.size() < config_ptr_->num_past) {
@@ -324,10 +327,16 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
     return;
   }
 
+  std::cerr << "Relative time \n";
   const auto relative_timestamps = getRelativeTimestamps();
+  for (const auto t : relative_timestamps) {
+    std::cerr << t << ", ";
+  }
+  std::cerr << "\n";
   AgentData agent_data(
     histories, static_cast<size_t>(sdc_index), target_indices, label_indices, relative_timestamps);
 
+  utils::print_agent_data(agent_data);
   std::vector<PredictedTrajectory> trajectories;
   if (!model_ptr_->doInference(agent_data, *polyline_ptr_, trajectories)) {
     RCLCPP_WARN(get_logger(), "Inference failed");
@@ -613,11 +622,13 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
   return target_indices;
 }
 
+// comment(Daniel): time from the first timestamp? should it be reversed?
 std::vector<float> MTRNode::getRelativeTimestamps() const
 {
-  auto output = timestamps_;
-  for (auto & t : output) {
-    t -= timestamps_.at(0);
+  std::vector<float> output;
+  output.reserve(timestamps_.size());
+  for (auto t : timestamps_) {
+    output.push_back(t - timestamps_.at(0));
   }
   return output;
 }
