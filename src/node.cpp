@@ -26,7 +26,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <vector>
 
 namespace autoware::mtr
 {
