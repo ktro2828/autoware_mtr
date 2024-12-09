@@ -16,6 +16,8 @@
 
 #include "attention/trt_attn_weight_computation_kernel.hpp"
 
+#include <string>
+
 namespace autoware::trt_mtr
 {
 namespace

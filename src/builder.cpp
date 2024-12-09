@@ -389,4 +389,4 @@ bool MTRBuilder::enqueueV2(void ** bindings, cudaStream_t stream, cudaEvent_t * 
 {
   return context_->enqueueV2(bindings, stream, inputConsumed);
 }
-}  // namespace autoware::trt_mtr
+}  // namespace autoware::mtr
