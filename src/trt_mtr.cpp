@@ -218,4 +218,4 @@ bool TrtMTR::postProcess(
   }
   return true;
 }
-}  // namespace autoware::trt_mtr
+}  // namespace autoware::mtr

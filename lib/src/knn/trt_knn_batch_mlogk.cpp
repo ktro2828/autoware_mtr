@@ -17,7 +17,7 @@
 #include "common/trt_serialize.hpp"
 #include "knn/trt_knn_batch_mlogk_kernel.hpp"
 
-#include <cstring>
+#include <string>
 
 namespace autoware::trt_mtr
 {
