@@ -168,7 +168,7 @@ private:
   PolylineTypeMap polyline_type_map_;
   std::shared_ptr<PolylineData> polyline_ptr_;
   std::vector<std::pair<float, AgentState>> ego_states_;
-  std::vector<float> timestamps_;
+  std::vector<double> timestamps_;
 };  // class MTRNode
 }  // namespace autoware::mtr
 #endif  // AUTOWARE__MTR__NODE_HPP_
