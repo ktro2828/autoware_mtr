@@ -597,9 +597,10 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
 
 std::vector<float> MTRNode::getRelativeTimestamps() const
 {
-  auto output = timestamps_;
+  std::vector<float> output;
+  output.reserve(timestamps_.size());
   for (auto & t : output) {
-    t -= timestamps_.at(0);
+    output.push_back(t - timestamps_.at(0));
   }
   return output;
 }
