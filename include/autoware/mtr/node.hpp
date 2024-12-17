@@ -61,37 +61,6 @@ using autoware_perception_msgs::msg::TrackedObject;
 using autoware_perception_msgs::msg::TrackedObjects;
 using nav_msgs::msg::Odometry;
 
-class PolylineTypeMap
-{
-public:
-  explicit PolylineTypeMap(rclcpp::Node * node)
-  {
-    const auto filepath = node->declare_parameter<std::string>("model_params.polyline_label_path");
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-      RCLCPP_ERROR_STREAM(node->get_logger(), "Could not open polyline label file: " << filepath);
-      rclcpp::shutdown();
-    }
-
-    int label_index = 0;
-    std::string label;
-    while (getline(file, label)) {
-      label_map_.insert({label, label_index});
-      ++label_index;
-    }
-  }
-
-  // Return the ID of the corresponding label type. If specified type is not contained in map,
-  // return `-1`.
-  [[nodiscard]] int getTypeID(const std::string & type) const
-  {
-    return label_map_.count(type) == 0 ? -1 : label_map_.at(type);
-  }
-
-private:
-  std::map<std::string, size_t> label_map_;
-};  // class PolylineTypeMap
-
 class MTRNode : public rclcpp::Node
 {
 public:
@@ -109,9 +78,6 @@ private:
 
   // Fetch data of Ego's odometry topic.
   bool fetchData();
-
-  // Convert Lanelet to `PolylineData`.
-  bool convertLaneletToPolyline();
 
   // Remove ancient agent histories.
   void removeAncientAgentHistory(
@@ -140,12 +106,12 @@ private:
 
   // ROS Publisher and Subscriber
   // TODO(ktro2828): add debug publisher
-  rclcpp::Publisher<PredictedObjects>::SharedPtr pub_objects_;
-  rclcpp::Subscription<TrackedObjects>::SharedPtr sub_objects_;
-  rclcpp::Subscription<HADMapBin>::SharedPtr sub_map_;
+  rclcpp::Publisher<PredictedObjects>::SharedPtr pub_objects_;   //!< PredictedObjects publisher
+  rclcpp::Subscription<TrackedObjects>::SharedPtr sub_objects_;  //!< TrackedObjects subscription
+  rclcpp::Subscription<HADMapBin>::SharedPtr sub_map_;           //!< LaneletMapBin subscription
   // polling subscriber
   autoware::universe_utils::InterProcessPollingSubscriber<Odometry> sub_ego_{
-    this, "/localization/kinematic_state"};
+    this, "/localization/kinematic_state"};  //!< Odometry subscription
 
   // Lanelet map pointers
   std::shared_ptr<lanelet::LaneletMap> lanelet_map_ptr_;
@@ -165,7 +131,6 @@ private:
   std::unique_ptr<MTRConfig> config_ptr_;
   std::unique_ptr<BuildConfig> build_config_ptr_;
   std::unique_ptr<TrtMTR> model_ptr_;
-  PolylineTypeMap polyline_type_map_;
   std::shared_ptr<PolylineData> polyline_ptr_;
   std::vector<std::pair<float, AgentState>> ego_states_;
   std::vector<double> timestamps_;

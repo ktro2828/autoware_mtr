@@ -26,9 +26,7 @@
 
 namespace autoware::mtr
 {
-constexpr size_t PointStateDim = 7;
-
-enum PolylineLabel { LANE = 0, ROAD_LINE = 1, ROAD_EDGE = 2, CROSSWALK = 3 };
+constexpr size_t PointStateDim = 6;
 
 struct LanePoint
 {
@@ -44,12 +42,10 @@ struct LanePoint
    * @param dx Normalized delta x.
    * @param dy Normalized delta y.
    * @param dz Normalized delta z.
-   * @param label Label.
    */
   LanePoint(
-    const float x, const float y, const float z, const float dx, const float dy, const float dz,
-    const float label)
-  : data_({x, y, z, dx, dy, dz, label}), x_(x), y_(y), z_(z), label_(label)
+    const float x, const float y, const float z, const float dx, const float dy, const float dz)
+  : data_({x, y, z, dx, dy, dz}), x_(x), y_(y), z_(z)
   {
   }
 
@@ -68,9 +64,6 @@ struct LanePoint
   // Return the z position of the point.
   float z() const { return z_; }
 
-  // Return the label of the point.
-  float label() const { return label_; }
-
   /**
    * @brief Return the distance between myself and another one.
    *
@@ -87,7 +80,7 @@ struct LanePoint
 
 private:
   std::array<float, PointStateDim> data_;
-  float x_{0.0f}, y_{0.0f}, z_{0.0f}, label_{0.0f};
+  float x_{0.0f}, y_{0.0f}, z_{0.0f};
 };
 
 struct PolylineData
@@ -123,8 +116,7 @@ struct PolylineData
       if (point_cnt >= num_point_) {
         addNewPolyline(cur_point, point_cnt);
       } else if (const auto & prev_point = points.at(i - 1);
-                 cur_point.distance(prev_point) >= distance_threshold_ ||
-                 cur_point.label() != prev_point.label()) {
+                 cur_point.distance(prev_point) >= distance_threshold_) {
         if (point_cnt < num_point_) {
           addEmptyPoints(point_cnt);
         }
@@ -234,72 +226,6 @@ private:
   std::vector<float> data_;
   const float distance_threshold_;
 };
-
-/**
- * @brief Generate LanePoints from LineString.
- *
- * @param linestring
- * @param type_id
- * @return std::vector<LanePoint>
- */
-std::vector<LanePoint> getLanePointFromLineString(
-  const lanelet::ConstLineString3d & linestring, const int type_id)
-{
-  if (linestring.size() == 0) {
-    return {};
-  }
-
-  const float type_value = static_cast<float>(type_id);
-  const auto & start = linestring.begin();
-  std::vector<LanePoint> points{
-    {static_cast<float>(start->x()), static_cast<float>(start->y()), static_cast<float>(start->z()),
-     0.0f, 0.0f, 0.0f, type_value}};
-  points.reserve(linestring.size());
-  for (auto itr = start + 1; itr != linestring.end(); ++itr) {
-    const auto dx = (itr)->x() - (itr - 1)->x();
-    const auto dy = (itr)->y() - (itr - 1)->y();
-    const auto dz = (itr)->z() - (itr - 1)->z();
-    const auto norm = std::hypot(dx, dy, dz);
-    points.emplace_back(
-      static_cast<float>(itr->x()), static_cast<float>(itr->y()), static_cast<float>(itr->z()),
-      static_cast<float>(dx / norm), static_cast<float>(dy / norm), static_cast<float>(dz / norm),
-      type_value);
-  }
-  return points;
-}
-
-/**
- * @brief Generate LanePoints from Polygon.
- *
- * @param polygon
- * @param type_id
- * @return std::vector<LanePoint>
- */
-std::vector<LanePoint> getLanePointFromPolygon(
-  const lanelet::CompoundPolygon3d & polygon, const int type_id)
-{
-  if (polygon.size() == 0) {
-    return {};
-  }
-
-  const float type_value = static_cast<float>(type_id);
-  const auto & start = polygon.begin();
-  std::vector<LanePoint> points{
-    {static_cast<float>(start->x()), static_cast<float>(start->y()), static_cast<float>(start->z()),
-     0.0f, 0.0f, 0.0f, type_value}};
-  points.reserve(polygon.size());
-  for (auto itr = start + 1; itr != polygon.end(); ++itr) {
-    const auto dx = (itr)->x() - (itr - 1)->x();
-    const auto dy = (itr)->y() - (itr - 1)->y();
-    const auto dz = (itr)->z() - (itr - 1)->z();
-    const auto norm = std::hypot(dx, dy, dz);
-    points.emplace_back(
-      static_cast<float>(itr->x()), static_cast<float>(itr->y()), static_cast<float>(itr->z()),
-      static_cast<float>(dx / norm), static_cast<float>(dy / norm), static_cast<float>(dz / norm),
-      type_value);
-  }
-  return points;
-}
 
 }  // namespace autoware::mtr
 #endif  // AUTOWARE__MTR__POLYLINE_HPP_

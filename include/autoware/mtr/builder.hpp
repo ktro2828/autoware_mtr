@@ -124,10 +124,53 @@ struct BuildConfig
   {
   }
 
+  BuildConfig(
+    const bool is_dynamic, const std::string & _precision, const std::string & _calibration,
+    const BatchOptConfig & batch_target = BatchOptConfig(1, 10, 20),
+    const BatchOptConfig & batch_agent = BatchOptConfig(1, 30, 50))
+  : batch_target(batch_target), batch_agent(batch_agent), is_dynamic_(is_dynamic)
+  {
+    precision = precision_from(_precision);
+    calibration = calibration_from(_calibration);
+  }
+
   bool is_dynamic() const { return is_dynamic_; }
 
 private:
   bool is_dynamic_;
+
+  // Return corresponding PrecisionType from string.
+  static PrecisionType precision_from(const std::string & name)
+  {
+    if (name == "FP32") {
+      return PrecisionType::FP32;
+    }
+    if (name == "FP16") {
+      return PrecisionType::FP16;
+    }
+    if (name == "INT8") {
+      return PrecisionType::INT8;
+    }
+    throw std::invalid_argument("Invalid precision name.");
+  }
+
+  // Return corresponding CalibrationType from string.
+  static CalibrationType calibration_from(const std::string & name)
+  {
+    if (name == "ENTROPY") {
+      return CalibrationType::ENTROPY;
+    }
+    if (name == "LEGACY") {
+      return CalibrationType::LEGACY;
+    }
+    if (name == "PERCENTILE") {
+      return CalibrationType::PERCENTILE;
+    }
+    if (name == "MINMAX") {
+      return CalibrationType::MINMAX;
+    }
+    throw std::invalid_argument("Invalid calibration name.");
+  }
 };  // struct BuildConfig
 
 class MTRBuilder

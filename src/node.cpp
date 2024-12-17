@@ -14,6 +14,8 @@
 
 #include "autoware/mtr/node.hpp"
 
+#include "autoware/mtr/map_conversion.hpp"
+
 #include <lanelet2_extension/utility/message_conversion.hpp>
 
 #include <geometry_msgs/msg/detail/pose__struct.hpp>
@@ -34,52 +36,6 @@ namespace autoware::mtr
 {
 namespace
 {
-// Return the Lanelet subtype name. If input Lanelet has no attribute named `type` return empty
-// string `""`.
-std::string getLaneletSubtype(const lanelet::Lanelet & lanelet)
-{
-  if (!lanelet.hasAttribute("subtype")) {
-    return "";
-  }
-  const auto subtype = lanelet.attribute("subtype").as<std::string>();
-  return subtype ? subtype.get() : "";
-}
-
-// Return the LineString type name. If input LineString has no attribute named `type` return empty
-// string `""`.
-std::string getLineStringType(const lanelet::ConstLineString3d & linestring)
-{
-  if (!linestring.hasAttribute("type")) {
-    return "";
-  }
-  const auto type = linestring.attribute("type").as<std::string>();
-  return type ? type.get() : "";
-}
-
-// Return the LineString subtype name. If input LineString has no attribute named `subtype` return
-// empty string `""`.
-std::string getLineStringSubtype(const lanelet::ConstLineString3d & linestring)
-{
-  if (!linestring.hasAttribute("subtype")) {
-    return "";
-  }
-  const auto subtype = linestring.attribute("subtype").as<std::string>();
-  return subtype ? subtype.get() : "";
-}
-
-// Check whether lanelet has an attribute named `turn_direction`.
-bool isTurnIntersection(const lanelet::Lanelet & lanelet)
-{
-  return (lanelet.hasAttribute("turn_direction"));
-}
-
-// Insert source `LanePoints` into target `LanePoints`.
-void insertLanePoints(const std::vector<LanePoint> & src, std::vector<LanePoint> & dst)
-{
-  dst.reserve(dst.size() * 2);
-  dst.insert(dst.end(), src.cbegin(), src.cend());
-}
-
 // Convert `TrackedObject` to `AgentState`.
 AgentState trackedObjectToAgentState(const TrackedObject & object, const bool is_valid)
 {
@@ -124,47 +80,13 @@ int getLabelIndex(const TrackedObject & object)
   }
   return -1;  // other labels
 }
-
-// Return corresponding PrecisionType from string.
-PrecisionType getPrecisionType(const std::string & name)
-{
-  if (name == "FP32") {
-    return PrecisionType::FP32;
-  }
-  if (name == "FP16") {
-    return PrecisionType::FP16;
-  }
-  if (name == "INT8") {
-    return PrecisionType::INT8;
-  }
-  throw std::invalid_argument("Invalid precision name.");
-}
-
-// Return corresponding CalibrationType from string.
-CalibrationType getCalibrationType(const std::string & name)
-{
-  if (name == "ENTROPY") {
-    return CalibrationType::ENTROPY;
-  }
-  if (name == "LEGACY") {
-    return CalibrationType::LEGACY;
-  }
-  if (name == "PERCENTILE") {
-    return CalibrationType::PERCENTILE;
-  }
-  if (name == "MINMAX") {
-    return CalibrationType::MINMAX;
-  }
-  throw std::invalid_argument("Invalid calibration name.");
-}
 }  // namespace
 
 MTRNode::MTRNode(const rclcpp::NodeOptions & node_options)
-: rclcpp::Node("mtr", node_options), transform_listener_(this), polyline_type_map_(this)
+: rclcpp::Node("mtr", node_options), transform_listener_(this)
 {
-  // TODO(ktro2828)
+  // Setup MTR
   {
-    // Build MTR
     // Model config
     const auto model_path = declare_parameter<std::string>("model_params.model_path");
     const auto target_labels =
@@ -187,14 +109,13 @@ MTRNode::MTRNode(const rclcpp::NodeOptions & node_options)
       point_break_distance, intention_point_filepath, num_intention_point_cluster);
     // Build config
     const auto is_dynamic = declare_parameter<bool>("build_params.is_dynamic");
-    const auto precision_str = declare_parameter<std::string>("build_params.precision");
-    const auto calibration_str = declare_parameter<std::string>("build_params.calibration");
-    const auto precision = getPrecisionType(precision_str);
-    const auto calibration = getCalibrationType(calibration_str);
+    const auto precision = declare_parameter<std::string>("build_params.precision");
+    const auto calibration = declare_parameter<std::string>("build_params.calibration");
     build_config_ptr_ = std::make_unique<BuildConfig>(is_dynamic, precision, calibration);
     model_ptr_ = std::make_unique<TrtMTR>(model_path, *config_ptr_, *build_config_ptr_);
   }
 
+  // Setup node
   sub_objects_ = create_subscription<TrackedObjects>(
     "~/input/objects", rclcpp::QoS{1}, std::bind(&MTRNode::callback, this, std::placeholders::_1));
   sub_map_ = create_subscription<HADMapBin>(
@@ -352,11 +273,14 @@ void MTRNode::onMap(const HADMapBin::ConstSharedPtr map_msg)
   lanelet::utils::conversion::fromBinMsg(
     *map_msg, lanelet_map_ptr_, &traffic_rules_ptr_, &routing_graph_ptr_);
 
-  RCLCPP_DEBUG(get_logger(), "[TensorRT MTR]: Start converting lanelet to polyline");
-  if (convertLaneletToPolyline()) {
-    RCLCPP_DEBUG(get_logger(), "[TensorRT MTR]: Success to convert lanelet to polyline");
+  RCLCPP_DEBUG(get_logger(), "Start converting lanelet to polyline");
+  polyline_ptr_ = lanelet_to_polyline(
+    lanelet_map_ptr_, config_ptr_->max_num_polyline, config_ptr_->max_num_point,
+    config_ptr_->point_break_distance);
+  if (polyline_ptr_) {
+    RCLCPP_DEBUG(get_logger(), "Success to convert lanelet to polyline");
   } else {
-    RCLCPP_WARN(get_logger(), "[TensorRT MTR]: Fail to convert lanelet to polyline");
+    RCLCPP_WARN(get_logger(), "Fail to convert lanelet to polyline");
   }
 }
 
@@ -400,74 +324,6 @@ bool MTRNode::fetchData()
   return true;
 }
 
-bool MTRNode::convertLaneletToPolyline()
-{
-  if (!lanelet_map_ptr_) {
-    return false;
-  }
-
-  std::vector<LanePoint> all_points;
-  for (const auto & lanelet : lanelet_map_ptr_->laneletLayer) {
-    const auto lanelet_subtype = getLaneletSubtype(lanelet);
-    if (
-      lanelet_subtype == "road" || lanelet_subtype == "highway" ||
-      lanelet_subtype == "road_shoulder" || lanelet_subtype == "pedestrian_lane" ||
-      lanelet_subtype == "bicycle_lane" || lanelet_subtype == "walkway") {
-      if (
-        lanelet_subtype == "road" || lanelet_subtype == "highway" ||
-        lanelet_subtype == "road_shoulder") {
-        const auto & type_id = polyline_type_map_.getTypeID(lanelet_subtype);
-        auto points = getLanePointFromLineString(lanelet.centerline3d(), type_id);
-        insertLanePoints(points, all_points);
-      }
-      if (!isTurnIntersection(lanelet)) {
-        const auto & left = lanelet.leftBound3d();
-        const auto left_type = getLineStringType(left);
-        if (left_type == "line_thin" || left_type == "line_thick") {
-          const auto left_subtype = getLineStringSubtype(left);
-          const auto & type_id = polyline_type_map_.getTypeID(left_subtype);
-          if (type_id != -1) {
-            auto points = getLanePointFromLineString(left, type_id);
-            insertLanePoints(points, all_points);
-          }
-        }
-        const auto & right = lanelet.rightBound3d();
-        const auto right_type = getLineStringType(right);
-        if (right_type == "line_thin" || right_type == "line_thick") {
-          const auto right_subtype = getLineStringSubtype(right);
-          const auto & type_id = polyline_type_map_.getTypeID(right_subtype);
-          if (type_id != -1) {
-            auto points = getLanePointFromLineString(right, type_id);
-            insertLanePoints(points, all_points);
-          }
-        }
-      }
-    } else if (lanelet_subtype == "crosswalk") {
-      const auto & type_id = polyline_type_map_.getTypeID(lanelet_subtype);
-      auto points = getLanePointFromPolygon(lanelet.polygon3d(), type_id);
-      insertLanePoints(points, all_points);
-    }
-  }
-
-  for (const auto & linestring : lanelet_map_ptr_->lineStringLayer) {
-    const auto linestring_type = getLineStringType(linestring);
-    if (linestring_type != "road_boarder" && linestring_type != "traffic_sign") {
-      continue;
-    }
-    const auto & type_id = polyline_type_map_.getTypeID(linestring_type);
-    auto points = getLanePointFromLineString(linestring, type_id);
-    insertLanePoints(points, all_points);
-  }
-
-  if (all_points.size() == 0) {
-    return false;
-  }
-  polyline_ptr_ = std::make_shared<PolylineData>(
-    all_points, config_ptr_->max_num_polyline, config_ptr_->max_num_point,
-    config_ptr_->point_break_distance);
-  return true;
-}
-
 void MTRNode::removeAncientAgentHistory(
   const float current_time, const TrackedObjects::ConstSharedPtr objects_msg)
 {
@@ -494,8 +350,8 @@ void MTRNode::removeAncientAgentHistory(
 void MTRNode::updateAgentHistory(
   const float current_time, const TrackedObjects::ConstSharedPtr objects_msg)
 {
-  // TODO(ktro2828): use ego info
   std::vector<std::string> observed_ids;
+  // Other agents
   for (const auto & object : objects_msg->objects) {
     auto label_index = getLabelIndex(object);
     if (label_index == -1) {
@@ -509,8 +365,8 @@ void MTRNode::updateAgentHistory(
     } else {
       object_msg_map_.at(object_id) = object;
     }
-    auto state = trackedObjectToAgentState(object, true);
 
+    auto state = trackedObjectToAgentState(object, true);
     if (agent_history_map_.count(object_id) == 0) {
       AgentHistory history(object_id, label_index, config_ptr_->num_past);
       history.update(current_time, state);
@@ -518,6 +374,14 @@ void MTRNode::updateAgentHistory(
     } else {
       agent_history_map_.at(object_id).update(current_time, state);
     }
+  }
+
+  // Ego vehicle
+  observed_ids.emplace_back(EGO_ID);
+  if (object_msg_map_.count(EGO_ID) == 0) {
+    object_msg_map_.emplace(EGO_ID, ego_tracked_object_);
+  } else {
+    object_msg_map_.at(EGO_ID) = ego_tracked_object_;
   }
 
   auto ego_state = extractNearestEgo(current_time);
@@ -528,8 +392,6 @@ void MTRNode::updateAgentHistory(
   } else {
     agent_history_map_.at(EGO_ID).update(current_time, ego_state);
   }
-  observed_ids.emplace_back(EGO_ID);
-  object_msg_map_.emplace(EGO_ID, ego_tracked_object_);
 
   // update unobserved histories with empty
   for (auto & [object_id, history] : agent_history_map_) {
