@@ -26,25 +26,26 @@ namespace autoware::mtr
 constexpr size_t PredictedStateDim = 7;
 
 /**
- * @brief A class to represent a predicted state.
+ * @brief A class to represent a predicted state. Note that output elements are (x, y, stdX,
+ * stdY, rho, vx, vy).
  */
 struct PredictedState
 {
   explicit PredictedState(const std::array<float, PredictedStateDim> & state)
   : x_(state.at(0)),
     y_(state.at(1)),
-    dx_(state.at(2)),
-    dy_(state.at(3)),
-    yaw_(state.at(4)),
+    std_x_(state.at(2)),
+    std_y_(state.at(3)),
+    rho_(state.at(4)),
     vx_(state.at(5)),
     vy_(state.at(6))
   {
   }
 
   PredictedState(
-    const float x, const float y, const float dx, const float dy, const float yaw, const float vx,
-    const float vy)
-  : x_(x), y_(y), dx_(dx), dy_(dy), yaw_(yaw), vx_(vx), vy_(vy)
+    const float x, const float y, const float std_x, const float std_y, const float rho,
+    const float vx, const float vy)
+  : x_(x), y_(y), std_x_(std_x), std_y_(std_y), rho_(rho), vx_(vx), vy_(vy)
   {
   }
 
@@ -57,14 +58,14 @@ struct PredictedState
   // Return the predicted y position.
   float y() const { return y_; }
 
-  // Return the predicted dx.
-  float dx() const { return dx_; }
+  // Return the predicted std x.
+  float std_x() const { return std_x_; }
 
-  // Return the predicted dy.
-  float dy() const { return dy_; }
+  // Return the predicted mean y.
+  float std_y() const { return std_y_; }
 
-  // Return the predicted yaw.
-  float yaw() const { return yaw_; }
+  // Return the predicted rho.
+  float rho() const { return rho_; }
 
   // Return the predicted x velocity.
   float vx() const { return vx_; }
@@ -73,7 +74,7 @@ struct PredictedState
   float vy() const { return vy_; }
 
 private:
-  float x_, y_, dx_, dy_, yaw_, vx_, vy_;
+  float x_, y_, std_x_, std_y_, rho_, vx_, vy_;
 };  // struct PredictedState
 
 /**
