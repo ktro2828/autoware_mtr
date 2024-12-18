@@ -137,7 +137,7 @@ struct AgentHistory
    */
   AgentHistory(
     const AgentState & state, const std::string & object_id, const size_t label_index,
-    const float current_time, const size_t max_time_length)
+    const double current_time, const size_t max_time_length)
   : queue_(max_time_length),
     object_id_(object_id),
     label_index_(label_index),
@@ -145,23 +145,6 @@ struct AgentHistory
     max_time_length_(max_time_length)
   {
     queue_.push_back(state);
-  }
-
-  /**
-   * @brief Construct a new Agent History filling all elements by zero.
-   *
-   * @param object_id Object ID.
-   * @param label_index Label ID.
-   * @param max_time_length History time length.
-   */
-  AgentHistory(
-    const std::string & object_id, const size_t label_index, const size_t max_time_length)
-  : queue_(max_time_length),
-    object_id_(object_id),
-    label_index_(label_index),
-    latest_time_(-std::numeric_limits<float>::max()),
-    max_time_length_(max_time_length)
-  {
   }
 
   // Return the history time length `T`.
@@ -184,9 +167,9 @@ struct AgentHistory
   /**
    * @brief Return the last timestamp when non-empty state was pushed.
    *
-   * @return float
+   * @return double
    */
-  float latest_time() const { return latest_time_; }
+  double latest_time() const { return latest_time_; }
 
   /**
    * @brief Update history with input state and latest time.
@@ -194,7 +177,7 @@ struct AgentHistory
    * @param current_time The current timestamp.
    * @param state The current agent state.
    */
-  void update(const float current_time, AgentState & state) noexcept
+  void update(double current_time, const AgentState & state) noexcept
   {
     queue_.push_back(state);
     latest_time_ = current_time;
@@ -227,7 +210,7 @@ struct AgentHistory
    * @return true If the difference is greater than threshold.
    * @return false Otherwise
    */
-  bool is_ancient(const float current_time, const float threshold) const
+  bool is_ancient(double current_time, double threshold) const
   {
     /* TODO: Raise error if the current time is smaller than latest */
     return current_time - latest_time_ >= threshold;
@@ -242,13 +225,13 @@ struct AgentHistory
   bool is_valid_latest() const { return get_latest_state().is_valid(); }
 
   // Get the latest agent state at `T`.
-  AgentState get_latest_state() const { return *queue_.end(); }
+  const AgentState & get_latest_state() const { return *queue_.end(); }
 
 private:
   FixedQueue<AgentState> queue_;
   const std::string object_id_;
   const size_t label_index_;
-  float latest_time_;
+  double latest_time_;
   const size_t max_time_length_;
 };
 

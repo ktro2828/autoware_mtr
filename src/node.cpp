@@ -20,6 +20,8 @@
 #include <lanelet2_extension/utility/message_conversion.hpp>
 #include <rclcpp/logging.hpp>
 
+#include <autoware_perception_msgs/msg/detail/object_classification__builder.hpp>
+#include <autoware_perception_msgs/msg/detail/tracked_object__struct.hpp>
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/vector3.hpp>
@@ -29,11 +31,16 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 namespace autoware::mtr
 {
+// TODO(ktro2828): use a parameter
+constexpr double TIME_THRESHOLD = 1.0;
+constexpr size_t MAX_NUM_TARGET = 2;
+
 namespace
 {
 // Return the Lanelet subtype name. If input Lanelet has no attribute named `type` return empty
@@ -153,7 +160,6 @@ CalibrationType getCalibrationType(const std::string & name)
 MTRNode::MTRNode(const rclcpp::NodeOptions & node_options)
 : rclcpp::Node("mtr", node_options), transform_listener_(this), polyline_type_map_(this)
 {
-  // TODO(ktro2828)
   {
     // Build MTR
     // Model config
@@ -207,66 +213,11 @@ MTRNode::MTRNode(const rclcpp::NodeOptions & node_options)
   }
 }
 
-TrackedObject MTRNode::makeEgoTrackedObject(const Odometry::ConstSharedPtr ego_msg) const
-{
-  auto createPoint32 =
-    [](const double x, const double y, const double z) -> geometry_msgs::msg::Point32 {
-    geometry_msgs::msg::Point32 p;
-    p.x = x;
-    p.y = y;
-    p.z = z;
-    return p;
-  };
-
-  TrackedObject output;
-  const auto ego_pose = ego_msg->pose;
-  const auto twist = ego_msg->twist;
-
-  // Classification and probability
-  {
-    output.existence_probability = 1.0;
-    ObjectClassification classification;
-    classification.label = ObjectClassification::CAR;
-    output.classification = {classification};
-  }
-
-  // Kinematics
-  {
-    output.kinematics.pose_with_covariance = ego_pose;
-    output.kinematics.twist_with_covariance = twist;
-  }
-  // Shape
-  {
-    const auto & ego_max_long_offset = vehicle_info_.max_longitudinal_offset_m;
-    const auto & ego_rear_overhang = vehicle_info_.vehicle_height_m;
-    const auto & ego_length = vehicle_info_.vehicle_length_m;
-    const auto & ego_width = vehicle_info_.vehicle_width_m;
-    const auto & ego_height = vehicle_info_.vehicle_height_m;
-
-    autoware_perception_msgs::msg::Shape shape;
-    shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
-    shape.dimensions.x = ego_length;
-    shape.dimensions.y = ego_width;
-    shape.dimensions.z = ego_height;
-
-    // TODO(Daniel): Should use overhang and ego info utils
-    geometry_msgs::msg::Point32 p;
-    shape.footprint.points.push_back(
-      createPoint32(-ego_rear_overhang, -ego_width / 2.0, ego_height));
-    shape.footprint.points.push_back(
-      createPoint32(-ego_rear_overhang, ego_width / 2.0, ego_height));
-    shape.footprint.points.push_back(
-      createPoint32(ego_max_long_offset, ego_width / 2.0, ego_height));
-    shape.footprint.points.push_back(
-      createPoint32(ego_max_long_offset, -ego_width / 2.0, ego_height));
-    output.shape = shape;
-  }
-  return output;
-}
-
 void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
 {
-  if (!fetchData()) {
+  const auto ego_msg = getLatestEgo();
+
+  if (!ego_msg) {
     RCLCPP_WARN(get_logger(), "No ego data");
     return;
   }
@@ -279,7 +230,7 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
   timestamps_->push_back(current_time);
 
   removeAncientAgentHistory(current_time, object_msg);
-  updateAgentHistory(current_time, object_msg);
+  updateAgentHistory(current_time, object_msg, ego_msg.value());
 
   std::vector<std::string> object_ids;
   std::vector<AgentHistory> histories;
@@ -297,10 +248,10 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
     }
   }
 
-  // if (sdc_index == -1) {
-  //   RCLCPP_WARN(get_logger(), "No EGO");
-  //   return;
-  // }
+  if (sdc_index == -1) {
+    RCLCPP_WARN(get_logger(), "No EGO");
+    return;
+  }
 
   const auto target_indices = extractTargetAgent(histories);
   if (target_indices.empty()) {
@@ -352,41 +303,66 @@ void MTRNode::onMap(const HADMapBin::ConstSharedPtr map_msg)
   }
 }
 
-bool MTRNode::fetchData()
+std::optional<TrackedObject> MTRNode::getLatestEgo()
 {
-  const Odometry::ConstSharedPtr ego_msg = sub_ego_.takeData();
-  if (!ego_msg) {
-    return false;
+  const Odometry::ConstSharedPtr odometry_msg = sub_ego_.takeData();
+  if (!odometry_msg) {
+    return std::nullopt;
   }
-  const auto current_time = static_cast<float>(rclcpp::Time(ego_msg->header.stamp).seconds());
-  const auto & position = ego_msg->pose.pose.position;
-  const auto & twist = ego_msg->twist.twist;
-  const float yaw = tf2::getYaw(ego_msg->pose.pose.orientation);
 
-  const auto & ego_length = vehicle_info_.vehicle_length_m;
-  const auto & ego_width = vehicle_info_.vehicle_width_m;
-  const auto & ego_height = vehicle_info_.vehicle_height_m;
+  auto createPoint32 =
+    [](const double x, const double y, const double z) -> geometry_msgs::msg::Point32 {
+    geometry_msgs::msg::Point32 p;
+    p.x = x;
+    p.y = y;
+    p.z = z;
+    return p;
+  };
 
-  const auto dimension =
-    geometry_msgs::build<geometry_msgs::msg::Vector3>().x(ego_length).y(ego_width).z(ego_height);
+  TrackedObject output;
+  // Classification and probability
+  {
+    output.existence_probability = 1.0;
+    ObjectClassification classification;
+    classification.label = ObjectClassification::CAR;
+    output.classification = {classification};
+  }
 
-  const auto latest_state = ego_states_->end();
-  const auto time_diff = current_time - latest_state->first;
+  // Kinematics
+  {
+    output.kinematics.pose_with_covariance = odometry_msg->pose;
+    output.kinematics.twist_with_covariance = odometry_msg->twist;
+  }
 
-  const auto acceleration =
-    geometry_msgs::build<geometry_msgs::msg::Vector3>()
-      .x((twist.linear.x - latest_state->second.vx()) / (time_diff + 1e-10f))
-      .y((twist.linear.y - latest_state->second.vy()) / (time_diff + 1e-10f))
-      .z(0.0f);
+  // Shape
+  {
+    const auto & ego_max_long_offset = vehicle_info_.max_longitudinal_offset_m;
+    const auto & ego_rear_overhang = vehicle_info_.vehicle_height_m;
+    const auto & ego_length = vehicle_info_.vehicle_length_m;
+    const auto & ego_width = vehicle_info_.vehicle_width_m;
+    const auto & ego_height = vehicle_info_.vehicle_height_m;
 
-  ego_states_->push_back(std::make_pair(
-    current_time, AgentState(position, dimension, yaw, twist.linear, acceleration, 1.0f)));
+    autoware_perception_msgs::msg::Shape shape;
+    shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
+    shape.dimensions.x = ego_length;
+    shape.dimensions.y = ego_width;
+    shape.dimensions.z = ego_height;
 
-  // make the ego vehicle a tracked object
-  ego_tracked_object_ = makeEgoTrackedObject(ego_msg);
-  return true;
+    // TODO(Daniel): Should use overhang and ego info utils
+    shape.footprint.points.emplace_back(
+      createPoint32(-ego_rear_overhang, -0.5 * ego_width, ego_height));
+    shape.footprint.points.emplace_back(
+      createPoint32(-ego_rear_overhang, 0.5 * ego_width, ego_height));
+    shape.footprint.points.emplace_back(
+      createPoint32(ego_max_long_offset, 0.5 * ego_width, ego_height));
+    shape.footprint.points.emplace_back(
+      createPoint32(ego_max_long_offset, -0.5 * ego_width, ego_height));
+    output.shape = shape;
+  }
+  return output;
 }
 
+// TODO(ktro2828): Refactoring lanelet conversion
 bool MTRNode::convertLaneletToPolyline()
 {
   if (!lanelet_map_ptr_) {
@@ -456,9 +432,8 @@ bool MTRNode::convertLaneletToPolyline()
 }
 
 void MTRNode::removeAncientAgentHistory(
-  const float current_time, const TrackedObjects::ConstSharedPtr objects_msg)
+  const double current_time, const TrackedObjects::ConstSharedPtr objects_msg)
 {
-  constexpr float time_threshold = 1.0f;  // TODO(ktro2828): use parameter
   for (const auto & object : objects_msg->objects) {
     const auto & object_id = autoware::universe_utils::toHexString(object.object_id);
     if (agent_history_map_.count(object_id) == 0) {
@@ -466,56 +441,54 @@ void MTRNode::removeAncientAgentHistory(
     }
 
     const auto & history = agent_history_map_.at(object_id);
-    if (history.is_ancient(current_time, time_threshold)) {
+    if (history.is_ancient(current_time, TIME_THRESHOLD)) {
       agent_history_map_.erase(object_id);
     }
   }
 
   if (
     agent_history_map_.count(EGO_ID) != 0 &&
-    agent_history_map_.at(EGO_ID).is_ancient(current_time, time_threshold)) {
+    agent_history_map_.at(EGO_ID).is_ancient(current_time, TIME_THRESHOLD)) {
     agent_history_map_.erase(EGO_ID);
   }
 }
 
 void MTRNode::updateAgentHistory(
-  const float current_time, const TrackedObjects::ConstSharedPtr objects_msg)
+  const double current_time, const TrackedObjects::ConstSharedPtr objects_msg,
+  const TrackedObject & ego_msg)
 {
   std::vector<std::string> observed_ids;
+  // other agents
   for (const auto & object : objects_msg->objects) {
     auto label_index = getLabelIndex(object);
     if (label_index == -1) {
       continue;
     }
 
-    const auto & object_id = autoware::universe_utils::toHexString(object.object_id);
+    const auto object_id = autoware::universe_utils::toHexString(object.object_id);
     observed_ids.emplace_back(object_id);
-    if (object_msg_map_.count(object_id) == 0) {
-      object_msg_map_.emplace(object_id, object);
-    } else {
-      object_msg_map_.at(object_id) = object;
-    }
-    auto state = createAgentState(object, true);
+    object_msg_map_.insert_or_assign(object_id, object);
 
+    const auto state = createAgentState(object, true);
     if (agent_history_map_.count(object_id) == 0) {
-      AgentHistory history(object_id, label_index, config_ptr_->num_past);
-      history.update(current_time, state);
+      AgentHistory history(state, object_id, label_index, current_time, config_ptr_->num_past);
       agent_history_map_.emplace(object_id, history);
     } else {
       agent_history_map_.at(object_id).update(current_time, state);
     }
   }
 
-  // auto ego_state = extractNearestEgo(current_time);
-  // if (agent_history_map_.count(EGO_ID) == 0) {
-  //   AgentHistory history(EGO_ID, AgentLabel::VEHICLE, config_ptr_->num_past);
-  //   history.update(current_time, ego_state);
-  //   agent_history_map_.emplace(EGO_ID, history);
-  // } else {
-  //   agent_history_map_.at(EGO_ID).update(current_time, ego_state);
-  // }
-  // observed_ids.emplace_back(EGO_ID);
-  // object_msg_map_.emplace(EGO_ID, ego_tracked_object_);
+  // ego vehicle
+  observed_ids.emplace_back(EGO_ID);
+  object_msg_map_.insert_or_assign(EGO_ID, ego_msg);
+
+  const auto ego = createAgentState(ego_msg, true);
+  if (agent_history_map_.count(EGO_ID) == 0) {
+    AgentHistory history(ego, EGO_ID, AgentLabel::VEHICLE, current_time, config_ptr_->num_past);
+    agent_history_map_.emplace(EGO_ID, history);
+  } else {
+    agent_history_map_.at(EGO_ID).update(current_time, ego);
+  }
 
   // update unobserved histories with empty
   for (auto & [object_id, history] : agent_history_map_) {
@@ -524,15 +497,6 @@ void MTRNode::updateAgentHistory(
     }
     history.update_empty();
   }
-}
-
-AgentState MTRNode::getCurrentEgoState(const float current_time) const
-{
-  auto state = std::min_element(
-    ego_states_->begin(), ego_states_->end(), [&](const auto & s1, const auto & s2) {
-      return std::abs(s1.first - current_time) < std::abs(s2.first - current_time);
-    });
-  return state->second;
 }
 
 std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> & histories)
@@ -546,10 +510,10 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
   }
 
   std::vector<std::pair<size_t, double>> index_distances;
-  for (size_t i = 0; i < histories.size(); ++i) {
-    const auto & history = histories.at(i);
+  for (size_t idx = 0; idx < histories.size(); ++idx) {
+    const auto & history = histories.at(idx);
     if (history.is_valid_latest() && history.object_id() != EGO_ID) {
-      const auto state = history.get_latest_state();
+      const auto & state = history.get_latest_state();
       geometry_msgs::msg::PoseStamped pose_in_map;
       pose_in_map.pose.position.x = state.x();
       pose_in_map.pose.position.y = state.y();
@@ -560,7 +524,7 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
       tf2::doTransform(pose_in_map, pose_in_ego, *map2ego);
 
       const auto distance = std::hypot(pose_in_ego.pose.position.x, pose_in_ego.pose.position.y);
-      index_distances.emplace_back(i, distance);
+      index_distances.emplace_back(idx, distance);
     }
   }
 
@@ -569,11 +533,10 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
     index_distances.begin(), index_distances.end(),
     [](const auto & item1, const auto & item2) { return item1.second < item2.second; });
 
-  constexpr size_t max_target_size = 2;  // TODO(ktro2828): use a parameter
   std::vector<size_t> target_indices;
   for (const auto & [idx, _] : index_distances) {
     target_indices.emplace_back(idx);
-    if (max_target_size <= target_indices.size()) {
+    if (MAX_NUM_TARGET <= target_indices.size()) {
       break;
     }
   }
