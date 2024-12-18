@@ -14,13 +14,18 @@
 
 #include "autoware/mtr/node.hpp"
 
+#include "autoware/mtr/agent.hpp"
 #include "autoware/mtr/map_conversion.hpp"
 
 #include <lanelet2_extension/utility/message_conversion.hpp>
+#include <rclcpp/logging.hpp>
 
+#include <autoware_perception_msgs/msg/detail/tracked_object__struct.hpp>
+#include <geometry_msgs/msg/detail/point__builder.hpp>
 #include <geometry_msgs/msg/detail/pose__struct.hpp>
 #include <geometry_msgs/msg/detail/twist__struct.hpp>
 #include <geometry_msgs/msg/detail/twist_with_covariance__struct.hpp>
+#include <geometry_msgs/msg/detail/vector3__struct.hpp>
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 
@@ -29,7 +34,10 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <optional>
+#include <ostream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace autoware::mtr
@@ -37,33 +45,22 @@ namespace autoware::mtr
 namespace
 {
 // Convert `TrackedObject` to `AgentState`.
-AgentState trackedObjectToAgentState(const TrackedObject & object, const bool is_valid)
+AgentState to_agent_state(const TrackedObject & object, const bool is_valid)
 {
   const auto & pose = object.kinematics.pose_with_covariance.pose;
   const auto & twist = object.kinematics.twist_with_covariance.twist;
   const auto & accel = object.kinematics.acceleration_with_covariance.accel;
   const auto & dimensions = object.shape.dimensions;
-  const auto yaw = tf2::getYaw(pose.orientation);
-  const auto valid = is_valid ? 1.0f : 0.0f;
 
-  return {
-    static_cast<float>(pose.position.x),
-    static_cast<float>(pose.position.y),
-    static_cast<float>(pose.position.z),
-    static_cast<float>(dimensions.x),
-    static_cast<float>(dimensions.y),
-    static_cast<float>(dimensions.z),
-    static_cast<float>(yaw),
-    static_cast<float>(twist.linear.x),
-    static_cast<float>(twist.linear.y),
-    static_cast<float>(accel.linear.x),
-    static_cast<float>(accel.linear.y),
-    valid};
+  const float yaw = tf2::getYaw(pose.orientation);
+  const float valid = is_valid ? 1.0f : 0.0f;
+
+  return {pose.position, dimensions, yaw, twist.linear, accel.linear, valid};
 }
 
 // Get the label index corresponding to AgentLabel. If the label of tracked object is not * defined
 // in AgentLabel returns `-1`.
-int getLabelIndex(const TrackedObject & object)
+int to_label_id(const TrackedObject & object)
 {
   const auto classification =
     autoware::object_recognition_utils::getHighestProbLabel(object.classification);
@@ -83,7 +80,7 @@ int getLabelIndex(const TrackedObject & object)
 }  // namespace
 
 MTRNode::MTRNode(const rclcpp::NodeOptions & node_options)
-: rclcpp::Node("mtr", node_options), transform_listener_(this)
+: rclcpp::Node("mtr", node_options), transform_listener_(this), ego_states_(100), timestamps_(11)
 {
   // Setup MTR
   {
@@ -118,7 +115,7 @@ MTRNode::MTRNode(const rclcpp::NodeOptions & node_options)
   // Setup node
   sub_objects_ = create_subscription<TrackedObjects>(
     "~/input/objects", rclcpp::QoS{1}, std::bind(&MTRNode::callback, this, std::placeholders::_1));
-  sub_map_ = create_subscription<HADMapBin>(
+  sub_map_ = create_subscription<LaneletMapBin>(
     "~/input/vector_map", rclcpp::QoS{1}.transient_local(),
     std::bind(&MTRNode::onMap, this, std::placeholders::_1));
 
@@ -184,12 +181,24 @@ TrackedObject MTRNode::makeEgoTrackedObject(const Odometry::ConstSharedPtr ego_m
       createPoint32(ego_max_long_offset, -ego_width / 2.0, ego_height));
     output.shape = shape;
   }
-  return output;
+  return TrackedObject(output);
+}
+
+template <typename T>
+std::ostream & operator<<(std::ostream & os, const std::vector<T> & values)
+{
+  os << "(";
+  for (const auto & v : values) {
+    os << v << " ";
+  }
+  os << ")";
+  return os;
 }
 
 void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
 {
-  if (!fetchData()) {
+  const auto current_ego_msg = fetchEgoState();
+  if (!current_ego_msg) {
     RCLCPP_WARN(get_logger(), "No ego data");
     return;
   }
@@ -200,18 +209,10 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
 
   const auto current_time = static_cast<float>(rclcpp::Time(object_msg->header.stamp).seconds());
 
-  timestamps_.emplace_back(current_time);
-  // TODO(ktro2828): update timestamps
-  if (timestamps_.size() < config_ptr_->num_past) {
-    RCLCPP_WARN(get_logger(), "Not enough timestamp");
-    return;  // Not enough timestamps
-  }
-  if (config_ptr_->num_past < timestamps_.size()) {
-    timestamps_.erase(timestamps_.begin(), timestamps_.begin() + 1);
-  }
+  timestamps_.push_back(current_time);
 
-  removeAncientAgentHistory(current_time, object_msg);
-  updateAgentHistory(current_time, object_msg);
+  removeAncientHistory(current_time, object_msg);
+  updateHistory(current_time, object_msg, current_ego_msg.value());
 
   std::vector<std::string> object_ids;
   std::vector<AgentHistory> histories;
@@ -234,7 +235,7 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
     return;
   }
 
-  const auto target_indices = extractTargetAgent(histories);
+  const auto target_indices = extractTarget(histories, object_msg->header);
   if (target_indices.empty()) {
     RCLCPP_WARN(get_logger(), "No target agents");
     return;
@@ -267,7 +268,7 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
   pub_objects_->publish(output);
 }
 
-void MTRNode::onMap(const HADMapBin::ConstSharedPtr map_msg)
+void MTRNode::onMap(const LaneletMapBin::ConstSharedPtr map_msg)
 {
   lanelet_map_ptr_ = std::make_shared<lanelet::LaneletMap>();
   lanelet::utils::conversion::fromBinMsg(
@@ -284,47 +285,41 @@ void MTRNode::onMap(const HADMapBin::ConstSharedPtr map_msg)
   }
 }
 
-bool MTRNode::fetchData()
+std::optional<TrackedObject> MTRNode::fetchEgoState()
 {
   const Odometry::ConstSharedPtr ego_msg = sub_ego_.takeData();
   if (!ego_msg) {
-    return false;
+    return std::nullopt;
   }
+
   const auto current_time = static_cast<float>(rclcpp::Time(ego_msg->header.stamp).seconds());
   const auto & position = ego_msg->pose.pose.position;
   const auto & twist = ego_msg->twist.twist;
-  const auto yaw = static_cast<float>(tf2::getYaw(ego_msg->pose.pose.orientation));
+
+  const float yaw = tf2::getYaw(ego_msg->pose.pose.orientation);
+
   float ax = 0.0f;
   float ay = 0.0f;
-  if (!ego_states_.empty()) {
-    const auto & latest_state = ego_states_.back();
-    const auto time_diff = current_time - latest_state.first;
-    ax = (static_cast<float>(twist.linear.x) - latest_state.second.vx()) / (time_diff + 1e-10f);
-    ay = static_cast<float>(twist.linear.y) - latest_state.second.vy() / (time_diff + 1e-10f);
-  }
+  const auto & latest_state = *ego_states_.end();
+  const auto time_diff = current_time - latest_state.first;
+  ax = (static_cast<float>(twist.linear.x) - latest_state.second.vx()) / (time_diff + 1e-10f);
+  ay = (static_cast<float>(twist.linear.y) - latest_state.second.vy()) / (time_diff + 1e-10f);
 
-  const auto & ego_length = vehicle_info_.vehicle_length_m;
-  const auto & ego_width = vehicle_info_.vehicle_width_m;
-  const auto & ego_height = vehicle_info_.vehicle_height_m;
+  const auto acceleration = geometry_msgs::build<geometry_msgs::msg::Vector3>().x(ax).y(ay).z(0.0);
 
-  ego_states_.emplace_back(
-    current_time,
-    AgentState(
-      static_cast<float>(position.x), static_cast<float>(position.y),
-      static_cast<float>(position.z), static_cast<float>(ego_length), static_cast<float>(ego_width),
-      static_cast<float>(ego_height), yaw, static_cast<float>(twist.linear.x),
-      static_cast<float>(twist.linear.y), ax, ay, true));
+  const auto dimensions = geometry_msgs::build<geometry_msgs::msg::Vector3>()
+                            .x(vehicle_info_.vehicle_length_m)
+                            .y(vehicle_info_.vehicle_width_m)
+                            .z(vehicle_info_.vehicle_height_m);
 
-  constexpr size_t max_buffer_size = 100;
-  if (max_buffer_size < ego_states_.size()) {
-    ego_states_.erase(ego_states_.begin(), ego_states_.begin());
-  }
+  ego_states_.push_back(std::make_pair(
+    current_time, AgentState(position, dimensions, yaw, twist.linear, acceleration, 1.0f)));
+
   // make the ego vehicle a tracked object
-  ego_tracked_object_ = makeEgoTrackedObject(ego_msg);
-  return true;
+  return makeEgoTrackedObject(ego_msg);
 }
 
-void MTRNode::removeAncientAgentHistory(
+void MTRNode::removeAncientHistory(
   const float current_time, const TrackedObjects::ConstSharedPtr objects_msg)
 {
   constexpr float time_threshold = 1.0f;  // TODO(ktro2828): use parameter
@@ -347,14 +342,15 @@ void MTRNode::removeAncientAgentHistory(
   }
 }
 
-void MTRNode::updateAgentHistory(
-  const float current_time, const TrackedObjects::ConstSharedPtr objects_msg)
+void MTRNode::updateHistory(
+  const float current_time, const TrackedObjects::ConstSharedPtr objects_msg,
+  const TrackedObject current_ego_msg)
 {
   std::vector<std::string> observed_ids;
   // Other agents
   for (const auto & object : objects_msg->objects) {
-    auto label_index = getLabelIndex(object);
-    if (label_index == -1) {
+    auto label_id = to_label_id(object);
+    if (label_id == -1) {
       continue;
     }
 
@@ -366,9 +362,9 @@ void MTRNode::updateAgentHistory(
       object_msg_map_.at(object_id) = object;
     }
 
-    auto state = trackedObjectToAgentState(object, true);
+    AgentState state = to_agent_state(object, true);
     if (agent_history_map_.count(object_id) == 0) {
-      AgentHistory history(object_id, label_index, config_ptr_->num_past);
+      AgentHistory history(object_id, label_id, config_ptr_->num_past);
       history.update(current_time, state);
       agent_history_map_.emplace(object_id, history);
     } else {
@@ -379,12 +375,12 @@ void MTRNode::updateAgentHistory(
   // Ego vehicle
   observed_ids.emplace_back(EGO_ID);
   if (object_msg_map_.count(EGO_ID) == 0) {
-    object_msg_map_.emplace(EGO_ID, ego_tracked_object_);
+    object_msg_map_.emplace(EGO_ID, current_ego_msg);
   } else {
-    object_msg_map_.at(EGO_ID) = ego_tracked_object_;
+    object_msg_map_.at(EGO_ID) = current_ego_msg;
   }
 
-  auto ego_state = extractNearestEgo(current_time);
+  AgentState ego_state = currentEgoState(current_time);
   if (agent_history_map_.count(EGO_ID) == 0) {
     AgentHistory history(EGO_ID, AgentLabel::VEHICLE, config_ptr_->num_past);
     history.update(current_time, ego_state);
@@ -402,33 +398,36 @@ void MTRNode::updateAgentHistory(
   }
 }
 
-AgentState MTRNode::extractNearestEgo(const float current_time) const
+AgentState MTRNode::currentEgoState(const float current_time) const
 {
-  auto state = std::min_element(
-    ego_states_.cbegin(), ego_states_.cend(), [&](const auto & s1, const auto & s2) {
+  auto state =
+    std::min_element(ego_states_.begin(), ego_states_.end(), [&](const auto & s1, const auto & s2) {
       return std::abs(s1.first - current_time) < std::abs(s2.first - current_time);
     });
   return state->second;
 }
 
-std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> & histories)
+std::vector<size_t> MTRNode::extractTarget(
+  const std::vector<AgentHistory> & histories, const std_msgs::msg::Header & header)
 {
-  std::vector<std::pair<size_t, float>> distances;
+  const auto map2ego = transform_listener_.getTransform(
+    "base_link", header.frame_id, header.stamp, rclcpp::Duration::from_seconds(0.1));
+
+  if (!map2ego) {
+    RCLCPP_WARN(get_logger(), "Failed to get transform from map to base_link.");
+    return {};
+  }
+
+  std::vector<std::pair<size_t, double>> distances;
   for (size_t i = 0; i < histories.size(); ++i) {
     const auto & history = histories.at(i);
     if (!history.is_valid_latest() || history.object_id() == EGO_ID) {
+      // TODO(ktro2828): allow to push ego state
       distances.emplace_back(i, INFINITY);
     } else {
-      auto map2ego = transform_listener_.getTransform(
-        "base_link",  // target
-        "map",        // src
-        rclcpp::Time(), rclcpp::Duration::from_seconds(0.1));
-      if (!map2ego) {
-        RCLCPP_WARN(get_logger(), "Failed to get transform from map to base_link.");
-        return {};
-      }
       const auto state = history.get_latest_state();
       geometry_msgs::msg::PoseStamped pose_in_map;
+      pose_in_map.header = header;
       pose_in_map.pose.position.x = state.x();
       pose_in_map.pose.position.y = state.y();
       pose_in_map.pose.position.z = state.z();
@@ -447,11 +446,16 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
     return item1.second < item2.second;
   });
 
-  constexpr size_t max_target_size = 2;  // TODO(ktro2828): use a parameter
+  // TODO(ktro2828): use a parameter
+  constexpr size_t max_target_size = 1;
+  constexpr double distance_threshold = 1000.0;
+
   std::vector<size_t> target_indices;
   target_indices.reserve(max_target_size);
-  for (const auto & [idx, _] : distances) {
-    target_indices.emplace_back(idx);
+  for (const auto & [idx, value] : distances) {
+    if (value < distance_threshold) {
+      target_indices.emplace_back(idx);
+    }
     if (max_target_size <= target_indices.size()) {
       break;
     }
@@ -464,8 +468,8 @@ std::vector<float> MTRNode::getRelativeTimestamps() const
 {
   std::vector<float> output;
   output.reserve(timestamps_.size());
-  for (auto & t : output) {
-    output.push_back(t - timestamps_.at(0));
+  for (const auto & t : timestamps_) {
+    output.push_back(t - *timestamps_.begin());
   }
   return output;
 }

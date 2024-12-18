@@ -32,7 +32,7 @@ std::vector<LanePoint> from_linestring(const lanelet::ConstLineString3d & linest
   const auto & start = linestring.begin();
   std::vector<LanePoint> points{
     {static_cast<float>(start->x()), static_cast<float>(start->y()), static_cast<float>(start->z()),
-     0.0f, 0.0f, 0.0f}};
+     0.0f, 0.0f, 0.0f, 0.0f}};  // TODO(ktro2828): label ID
   points.reserve(linestring.size());
   for (auto itr = start + 1; itr != linestring.end(); ++itr) {
     const auto dx = (itr)->x() - (itr - 1)->x();
@@ -41,7 +41,8 @@ std::vector<LanePoint> from_linestring(const lanelet::ConstLineString3d & linest
     const auto norm = std::hypot(dx, dy, dz);
     points.emplace_back(
       static_cast<float>(itr->x()), static_cast<float>(itr->y()), static_cast<float>(itr->z()),
-      static_cast<float>(dx / norm), static_cast<float>(dy / norm), static_cast<float>(dz / norm));
+      static_cast<float>(dx / norm), static_cast<float>(dy / norm), static_cast<float>(dz / norm),
+      0.0f);  // TODO(ktro2828): Label ID
   }
   return points;
 }
@@ -55,7 +56,7 @@ std::vector<LanePoint> from_polygon(const lanelet::CompoundPolygon3d & polygon)
   const auto & start = polygon.begin();
   std::vector<LanePoint> points{
     {static_cast<float>(start->x()), static_cast<float>(start->y()), static_cast<float>(start->z()),
-     0.0f, 0.0f, 0.0f}};
+     0.0f, 0.0f, 0.0f, 0.0f}};  // TODO(ktro2828): Label ID
   points.reserve(polygon.size());
   for (auto itr = start + 1; itr != polygon.end(); ++itr) {
     const auto dx = (itr)->x() - (itr - 1)->x();
@@ -64,7 +65,8 @@ std::vector<LanePoint> from_polygon(const lanelet::CompoundPolygon3d & polygon)
     const auto norm = std::hypot(dx, dy, dz);
     points.emplace_back(
       static_cast<float>(itr->x()), static_cast<float>(itr->y()), static_cast<float>(itr->z()),
-      static_cast<float>(dx / norm), static_cast<float>(dy / norm), static_cast<float>(dz / norm));
+      static_cast<float>(dx / norm), static_cast<float>(dy / norm), static_cast<float>(dz / norm),
+      0.0f);  // TODO(ktro2828): Label ID
   }
   return points;
 }

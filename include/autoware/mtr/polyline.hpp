@@ -26,12 +26,12 @@
 
 namespace autoware::mtr
 {
-constexpr size_t PointStateDim = 6;
+constexpr size_t PointStateDim = 7;
 
 struct LanePoint
 {
   // Construct a new instance filling all elements by `0.0f`.
-  LanePoint() : data_({0.0f}) {}
+  LanePoint() {}
 
   /**
    * @brief Construct a new instance with specified values.
@@ -42,10 +42,10 @@ struct LanePoint
    * @param dx Normalized delta x.
    * @param dy Normalized delta y.
    * @param dz Normalized delta z.
+   * @param label Label.
    */
-  LanePoint(
-    const float x, const float y, const float z, const float dx, const float dy, const float dz)
-  : data_({x, y, z, dx, dy, dz}), x_(x), y_(y), z_(z)
+  LanePoint(float x, float y, float z, float dx, float dy, float dz, float label)
+  : x_(x), y_(y), z_(z), dx_(dx), dy_(dy), dz_(dz), label_(label)
   {
   }
 
@@ -75,12 +75,13 @@ struct LanePoint
     return std::hypot(x_ - other.x(), y_ - other.y(), z_ - other.z());
   }
 
-  // Return the address pointer of data array.
-  const float * data_ptr() const noexcept { return data_.data(); }
+  std::array<float, PointStateDim> as_array() const noexcept
+  {
+    return {x_, y_, z_, dx_, dy_, dz_, label_};
+  }
 
 private:
-  std::array<float, PointStateDim> data_;
-  float x_{0.0f}, y_{0.0f}, z_{0.0f};
+  float x_{0.0f}, y_{0.0f}, z_{0.0f}, dx_{0.0f}, dy_{0.0f}, dz_{0.0f}, label_{0.0f};
 };
 
 struct PolylineData
@@ -182,9 +183,8 @@ private:
    */
   void addNewPolyline(const LanePoint & point, size_t & point_cnt)
   {
-    const auto s = point.data_ptr();
-    for (size_t d = 0; d < state_dim(); ++d) {
-      data_.push_back(*(s + d));
+    for (const auto & p : point.as_array()) {
+      data_.push_back(p);
     }
     ++num_polyline_;
     point_cnt = 1;
@@ -197,10 +197,9 @@ private:
    */
   void addEmptyPoints(size_t & point_cnt)
   {
-    const auto s = LanePoint::empty().data_ptr();
     for (std::size_t n = point_cnt; n < num_point_; ++n) {
-      for (std::size_t d = 0; d < state_dim(); ++d) {
-        data_.push_back(*(s + d));
+      for (const auto & p : LanePoint::empty().as_array()) {
+        data_.push_back(p);
       }
     }
     point_cnt = num_point_;
@@ -214,9 +213,8 @@ private:
    */
   void addPoint(const LanePoint & point, std::size_t & point_cnt)
   {
-    const auto s = point.data_ptr();
-    for (size_t d = 0; d < state_dim(); ++d) {
-      data_.push_back(*(s + d));
+    for (const auto & p : point.as_array()) {
+      data_.push_back(p);
     }
     ++point_cnt;
   }
@@ -224,7 +222,7 @@ private:
   size_t num_polyline_;
   size_t num_point_;
   std::vector<float> data_;
-  const float distance_threshold_;
+  float distance_threshold_;
 };
 
 }  // namespace autoware::mtr

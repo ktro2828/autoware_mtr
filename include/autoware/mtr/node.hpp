@@ -17,6 +17,7 @@
 
 #include "autoware/mtr/agent.hpp"
 #include "autoware/mtr/polyline.hpp"
+#include "autoware/mtr/queue.hpp"
 #include "autoware/mtr/trajectory.hpp"
 #include "autoware/mtr/trt_mtr.hpp"
 
@@ -25,11 +26,13 @@
 #include <autoware/universe_utils/ros/polling_subscriber.hpp>
 #include <autoware/universe_utils/ros/transform_listener.hpp>
 #include <autoware/universe_utils/ros/uuid_helper.hpp>
+#include <autoware_vehicle_info_utils/vehicle_info.hpp>
 #include <autoware_vehicle_info_utils/vehicle_info_utils.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 #include <autoware_map_msgs/msg/detail/lanelet_map_bin__struct.hpp>
 #include <autoware_map_msgs/msg/lanelet_map_bin.hpp>
+#include <autoware_perception_msgs/msg/detail/tracked_object__struct.hpp>
 #include <autoware_perception_msgs/msg/object_classification.hpp>
 #include <autoware_perception_msgs/msg/predicted_object_kinematics.hpp>
 #include <autoware_perception_msgs/msg/predicted_objects.hpp>
@@ -44,14 +47,15 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace autoware::mtr
 {
-using HADMapBin = autoware_map_msgs::msg::LaneletMapBin;
 using autoware::vehicle_info_utils::VehicleInfo;
+using autoware_map_msgs::msg::LaneletMapBin;
 using autoware_perception_msgs::msg::ObjectClassification;
 using autoware_perception_msgs::msg::PredictedObject;
 using autoware_perception_msgs::msg::PredictedObjectKinematics;
@@ -74,27 +78,29 @@ private:
   void callback(const TrackedObjects::ConstSharedPtr object_msg);
 
   // Callback being invoked when the HD map topic is subscribed.
-  void onMap(const HADMapBin::ConstSharedPtr map_msg);
+  void onMap(const LaneletMapBin::ConstSharedPtr map_msg);
 
   // Fetch data of Ego's odometry topic.
-  bool fetchData();
+  std::optional<TrackedObject> fetchEgoState();
 
   // Remove ancient agent histories.
-  void removeAncientAgentHistory(
+  void removeAncientHistory(
     const float current_time, const TrackedObjects::ConstSharedPtr objects_msg);
 
   // Appends new states to history.
-  void updateAgentHistory(
-    const float current_time, const TrackedObjects::ConstSharedPtr objects_msg);
+  void updateHistory(
+    const float current_time, const TrackedObjects::ConstSharedPtr objects_msg,
+    const TrackedObject current_ego_msg);
 
   // Extract ego state stored in the buffer which has the nearest timestamp from current timestamp.
-  AgentState extractNearestEgo(const float current_time) const;
+  AgentState currentEgoState(const float current_time) const;
 
   [[nodiscard]] TrackedObject makeEgoTrackedObject(const Odometry::ConstSharedPtr ego_msg) const;
 
   // Extract target agents and return corresponding indices.
   // NOTE: Extract targets in order of proximity, closest first.
-  std::vector<size_t> extractTargetAgent(const std::vector<AgentHistory> & histories);
+  std::vector<size_t> extractTarget(
+    const std::vector<AgentHistory> & histories, const std_msgs::msg::Header & header);
 
   // Return the timestamps relative from the first element.Return the timestamps relative from the
   // first element.
@@ -108,32 +114,32 @@ private:
   // TODO(ktro2828): add debug publisher
   rclcpp::Publisher<PredictedObjects>::SharedPtr pub_objects_;   //!< PredictedObjects publisher
   rclcpp::Subscription<TrackedObjects>::SharedPtr sub_objects_;  //!< TrackedObjects subscription
-  rclcpp::Subscription<HADMapBin>::SharedPtr sub_map_;           //!< LaneletMapBin subscription
+  rclcpp::Subscription<LaneletMapBin>::SharedPtr sub_map_;       //!< LaneletMapBin subscription
   // polling subscriber
   autoware::universe_utils::InterProcessPollingSubscriber<Odometry> sub_ego_{
     this, "/localization/kinematic_state"};  //!< Odometry subscription
 
   // Lanelet map pointers
-  std::shared_ptr<lanelet::LaneletMap> lanelet_map_ptr_;
-  std::shared_ptr<lanelet::routing::RoutingGraph> routing_graph_ptr_;
-  std::shared_ptr<lanelet::traffic_rules::TrafficRules> traffic_rules_ptr_;
+  std::shared_ptr<lanelet::LaneletMap> lanelet_map_ptr_;               //!< Lanelet map pointer
+  std::shared_ptr<lanelet::routing::RoutingGraph> routing_graph_ptr_;  //!< Routing graph pointer
+  std::shared_ptr<lanelet::traffic_rules::TrafficRules>
+    traffic_rules_ptr_;  //!< Traffic rules pointer
 
   // Agent history
-  std::map<std::string, AgentHistory> agent_history_map_;
-  std::map<std::string, TrackedObject> object_msg_map_;
-  TrackedObject ego_tracked_object_;
-  VehicleInfo vehicle_info_;
+  std::map<std::string, AgentHistory> agent_history_map_;  //!< Map of UUID and its history.
+  std::map<std::string, TrackedObject> object_msg_map_;    //!< Map of UUID and its tracked msg.
+  VehicleInfo vehicle_info_;                               //!< Vehicle info
 
   // Pose transform listener
-  autoware::universe_utils::TransformListener transform_listener_;
+  autoware::universe_utils::TransformListener transform_listener_;  //!< TF listener
 
   // MTR parameters
-  std::unique_ptr<MTRConfig> config_ptr_;
-  std::unique_ptr<BuildConfig> build_config_ptr_;
-  std::unique_ptr<TrtMTR> model_ptr_;
-  std::shared_ptr<PolylineData> polyline_ptr_;
-  std::vector<std::pair<float, AgentState>> ego_states_;
-  std::vector<double> timestamps_;
+  std::unique_ptr<MTRConfig> config_ptr_;                //!< MTR config pointer
+  std::unique_ptr<BuildConfig> build_config_ptr_;        //!< Build config pointer
+  std::unique_ptr<TrtMTR> model_ptr_;                    //!< Model pointer
+  std::shared_ptr<PolylineData> polyline_ptr_;           //!< Polyline pointer
+  FixedQueue<std::pair<float, AgentState>> ego_states_;  //!< Ego state buffer
+  FixedQueue<double> timestamps_;                        //!< Timestamp buffer
 };  // class MTRNode
 }  // namespace autoware::mtr
 #endif  // AUTOWARE__MTR__NODE_HPP_

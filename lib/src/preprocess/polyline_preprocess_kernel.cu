@@ -14,6 +14,8 @@
 
 #include "preprocess/polyline_preprocess_kernel.cuh"
 
+#include <cub/cub.cuh>
+
 #include <float.h>
 
 #include <iostream>
@@ -126,51 +128,54 @@ __global__ void calculateCenterDistanceKernel(
   distance[b * K + k] = hypot(centerX, centerY);
 }
 
+template <unsigned int BLOCK_THREADS, unsigned int ITEMS_PER_THREAD>
 __global__ void extractTopKPolylineKernel(
   const int K, const int B, const int L, const int P, const int D, const float * inPolyline,
   const bool * inPolylineMask, const float * inDistance, float * outPolyline,
   bool * outPolylineMask)
 {
   int b = blockIdx.x;                             // Batch index
-  int tid = threadIdx.x;                          // Polyline index
+  int tid = threadIdx.x;                          // Thread local index in this CUDA block
   int p = blockIdx.y * blockDim.y + threadIdx.y;  // Point index
   int d = blockIdx.z * blockDim.z + threadIdx.z;  // Dim index
+  // Since all threads in a block expected to work wiht CUB, `return` shold not be called here
+  // if (b >= B || tid >= L || p >= P || d >= D) {
+  //   return;
+  // }
+
+  // Specialize BlockRadixSort type
+  using BlockRadixSortT = cub::BlockRadixSort<float, BLOCK_THREADS, ITEMS_PER_THREAD, unsigned int>;
+  using TempStorageT = typename BlockRadixSortT::TempStorage;
+
+  __shared__ TempStorageT temp_storage;
+
+  float distances[ITEMS_PER_THREAD] = {0};
+  unsigned int distance_indices[ITEMS_PER_THREAD] = {0};
+  for (unsigned int i = 0; i < ITEMS_PER_THREAD; i++) {
+    int polyline_idx = BLOCK_THREADS * i + tid;  // index order don't need to care.
+    int distance_idx = b * L + polyline_idx;
+    distance_indices[i] = polyline_idx;
+    distances[i] = (polyline_idx < L && distance_idx < B * L) ? inDistance[distance_idx] : FLT_MAX;
+  }
+
+  BlockRadixSortT(temp_storage).Sort(distances, distance_indices);
+  // Block-wide sync barrier necessary to refer the sort result
+  __syncthreads();
+
   if (b >= B || tid >= L || p >= P || d >= D) {
     return;
   }
-  extern __shared__ float distances[];
 
-  // Load distances into shared memory
-  if (tid < L) {
-    distances[tid] = inDistance[b * L + tid];
-  }
-  __syncthreads();
-
-  // Simple selection of the smallest K distances
-  // (this part should be replaced with a more efficient sorting/selecting algorithm)
-  for (int k = 0; k < K; k++) {
-    float minDistance = FLT_MAX;
-    int minIndex = -1;
-
-    for (int l = 0; l < L; l++) {
-      if (distances[l] < minDistance) {
-        minDistance = distances[l];
-        minIndex = l;
-      }
-    }
-    __syncthreads();
-
-    if (minIndex == -1) {
+  for (unsigned int i = 0; i < ITEMS_PER_THREAD; i++) {
+    int consective_polyline_idx =
+      tid * ITEMS_PER_THREAD + i;  // To keep sorted order, theads have to write consective region
+    int inIdx = b * L * P + distance_indices[i] * P + p;
+    int outIdx = b * K * P + consective_polyline_idx * P + p;
+    if (consective_polyline_idx >= K || fabsf(FLT_MAX - distances[i]) < FLT_EPSILON) {
       continue;
     }
-
-    if (tid == k) {  // this thread will handle copying the k-th smallest polyline
-      int inIdx = b * L * P + minIndex * P + p;
-      int outIdx = b * K * P + k * P + p;
-      outPolyline[outIdx * D + d] = inPolyline[inIdx * D + d];
-      outPolylineMask[outIdx] = inPolylineMask[inIdx];
-    }
-    distances[minIndex] = FLT_MAX;  // exclude this index from future consideration
+    outPolyline[outIdx * D + d] = inPolyline[inIdx * D + d];
+    outPolylineMask[outIdx] = inPolylineMask[inIdx];
   }
 }
 
@@ -222,31 +227,37 @@ cudaError_t polylinePreprocessWithTopkLauncher(
 
   const int outPointDim = PointDim + 2;  // 9
 
-  constexpr dim3 threads(8, 8, 8);
+  dim3 threads(8, 8, 8);
 
-  const dim3 blocks1(
+  dim3 blocks1(
     (B + threads.x - 1) / threads.x, (L + threads.y - 1) / threads.y,
     (P + threads.z - 1) / threads.z);
   transformPolylineKernel<<<blocks1, threads, 0, stream>>>(
     L, P, PointDim, inPolyline, B, AgentDim, targetState, tmpPolyline, tmpPolylineMask);
 
-  const dim3 blocks2((B + threads.x - 1) / threads.x, (L + threads.y - 1) / threads.y);
+  dim3 blocks2((B + threads.x - 1) / threads.x, (L + threads.y - 1) / threads.y);
   calculateCenterDistanceKernel<<<blocks2, threads, 0, stream>>>(
     B, L, P, outPointDim, tmpPolyline, tmpPolylineMask, tmpDistance);
 
-  const dim3 blocks3(
-    (B + threads.x - 1) / threads.x, (P + threads.y - 1) / threads.y,
-    (outPointDim + threads.z - 1) / threads.z);
-  extractTopKPolylineKernel<<<blocks3, threads, sizeof(float) * L, stream>>>(
-    K, B, L, P, outPointDim, tmpPolyline, tmpPolylineMask, tmpDistance, outPolyline,
-    outPolylineMask);
+  constexpr unsigned int threadsPerBlock = 256;
+  const dim3 blocks3(B, P, outPointDim);
+  constexpr unsigned int itemsPerThread = 24;
+  if (threadsPerBlock * itemsPerThread < L) {
+    std::cerr << "Larger L (" << L << ") than acceptable range (< "
+              << threadsPerBlock * itemsPerThread << ") detected." << std::endl;
+    return cudaError_t::cudaErrorInvalidValue;
+  }
+  extractTopKPolylineKernel<threadsPerBlock, itemsPerThread>
+    <<<blocks3, threadsPerBlock, 0, stream>>>(
+      K, B, L, P, outPointDim, tmpPolyline, tmpPolylineMask, tmpDistance, outPolyline,
+      outPolylineMask);
 
-  const dim3 blocks4(
+  dim3 blocks4(
     (B + threads.x - 1) / threads.x, (K + threads.y - 1) / threads.y,
     (P + threads.z - 1) / threads.z);
   setPreviousPositionKernel<<<blocks4, threads, 0, stream>>>(B, K, P, outPointDim, outPolyline);
 
-  const dim3 blocks5((B + threads.x - 1) / threads.x, (K + threads.y - 1) / threads.y);
+  dim3 blocks5((B + threads.x - 1) / threads.x, (K + threads.y - 1) / threads.y);
   calculatePolylineCenterKernel<<<blocks5, threads, 0, stream>>>(
     B, K, P, outPointDim, outPolyline, outPolylineMask, outPolylineCenter);
 
@@ -260,8 +271,8 @@ cudaError_t polylinePreprocessLauncher(
 {
   const int outPointDim = PointDim + 2;  // 9
 
-  constexpr dim3 threads(8, 8, 8);
-  const dim3 block3d(
+  dim3 threads(8, 8, 8);
+  dim3 block3d(
     (B + threads.x - 1) / threads.x, (K + threads.y - 1) / threads.y,
     (P + threads.z - 1) / threads.z);
   transformPolylineKernel<<<block3d, threads, 0, stream>>>(
@@ -269,7 +280,7 @@ cudaError_t polylinePreprocessLauncher(
 
   setPreviousPositionKernel<<<block3d, threads, 0, stream>>>(B, K, P, outPointDim, outPolyline);
 
-  const dim3 block2d((B + threads.x - 1) / threads.x, (K + threads.y - 1) / threads.y);
+  dim3 block2d((B + threads.x - 1) / threads.x, (K + threads.y - 1) / threads.y);
   calculatePolylineCenterKernel<<<block2d, threads, 0, stream>>>(
     B, K, P, outPointDim, outPolyline, outPolylineMask, outPolylineCenter);
 

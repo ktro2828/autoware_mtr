@@ -15,6 +15,11 @@
 #ifndef AUTOWARE__MTR__AGENT_HPP_
 #define AUTOWARE__MTR__AGENT_HPP_
 
+#include "autoware/mtr/queue.hpp"
+
+#include <geometry_msgs/msg/point.hpp>
+#include <geometry_msgs/msg/vector3.hpp>
+
 #include <algorithm>
 #include <array>
 #include <limits>
@@ -35,51 +40,25 @@ enum AgentLabel { VEHICLE = 0, PEDESTRIAN = 1, CYCLIST = 2 };
 struct AgentState
 {
   // Construct a new instance filling all elements by `0.0f`.
-  AgentState() : data_({0.0f}) {}
+  AgentState() : yaw_(0.0f) {}
 
   /**
    * @brief Construct a new instance with specified values.
    *
-   * @param x X position.
-   * @param y Y position.
-   * @param z Z position.
-   * @param length Length of the bbox.
-   * @param width Width of the bbox.
-   * @param height Height of the bbox.
    * @param yaw Heading yaw angle [rad].
-   * @param vx Velocity heading x direction in object's coordinates system.
-   * @param vy Velocity heading y direction in object's coordinates system.
-   * @param ax Acceleration heading x direction in object's coordinates system.
-   * @param ay Acceleration heading y direction in object's coordinates system.
    * @param is_valid `1.0f` if valid, otherwise `0.0f`.
    */
   AgentState(
-    const float x, const float y, const float z, const float length, const float width,
-    const float height, const float yaw, const float vx, const float vy, const float ax,
-    const float ay, const float is_valid)
-  : data_({x, y, z, length, width, height, yaw, vx, vy, ax, ay, is_valid}),
-    x_(x),
-    y_(y),
-    z_(z),
-    length_(length),
-    width_(width),
-    height_(height),
+    const geometry_msgs::msg::Point & position, const geometry_msgs::msg::Vector3 & size,
+    const float yaw, const geometry_msgs::msg::Vector3 & velocity,
+    const geometry_msgs::msg::Vector3 & acceleration, const float is_valid)
+  : position_(position),
+    size_(size),
     yaw_(yaw),
-    vx_(vx),
-    vy_(vy),
-    ax_(ax),
+    velocity_(velocity),
+    acceleration_(acceleration),
     is_valid_(is_valid)
   {
-  }
-
-  /**
-   * @brief Construct a new instance with a pointer.
-   *
-   * @param ptr
-   */
-  explicit AgentState(const std::vector<float>::const_iterator & itr)
-  {
-    std::copy(itr, itr + dim(), data_.begin());
   }
 
   // Construct a new instance filling all elements by `0.0f`.
@@ -88,49 +67,54 @@ struct AgentState
   // Return the agent state dimensions `D`.
   static size_t dim() { return AgentStateDim; }
 
-  // Return the address pointer of data array.
-  const float * data_ptr() const noexcept { return data_.data(); }
-
   // Return the x position.
-  float x() const { return x_; }
+  float x() const { return position_.x; }
 
   // Return the y position.
-  float y() const { return y_; }
+  float y() const { return position_.y; }
 
   // Return the z position.
-  float z() const { return z_; }
+  float z() const { return position_.z; }
 
   // Return the length of object size.
-  float length() const { return length_; }
+  float length() const { return size_.x; }
 
   // Return the width of object size.
-  float width() const { return width_; }
+  float width() const { return size_.y; }
 
   // Return the height of object size.
-  float height() const { return height_; }
+  float height() const { return size_.z; }
 
   // Return the yaw angle `[rad]`.
   float yaw() const { return yaw_; }
 
   // Return the x velocity.
-  float vx() const { return vx_; }
+  float vx() const { return velocity_.x; }
 
   // Return the y velocity.
-  float vy() const { return vy_; }
+  float vy() const { return velocity_.y; }
 
   // Return the x acceleration.
-  float ax() const { return ax_; }
+  float ax() const { return acceleration_.x; }
 
   // Return the y acceleration.
-  float ay() const { return ay_; }
+  float ay() const { return acceleration_.y; }
 
   // Return `true` if the value is `1.0`.
   bool is_valid() const { return is_valid_ == 1.0f; }
 
+  std::array<float, AgentStateDim> as_array() const noexcept
+  {
+    return {x(), y(), z(), length(), width(), height(), yaw(), vx(), vy(), ax(), ay(), is_valid_};
+  }
+
 private:
-  std::array<float, AgentStateDim> data_;
-  float x_{0.0f}, y_{0.0f}, z_{0.0f}, length_{0.0f}, width_{0.0f}, height_{0.0f}, yaw_{0.0f},
-    vx_{0.0f}, vy_{0.0f}, ax_{0.0f}, ay_{0.0f}, is_valid_{0.0f};
+  geometry_msgs::msg::Point position_;
+  geometry_msgs::msg::Vector3 size_;
+  float yaw_;
+  geometry_msgs::msg::Vector3 velocity_;
+  geometry_msgs::msg::Vector3 acceleration_;
+  float is_valid_;
 };
 
 /**
@@ -155,10 +139,7 @@ struct AgentHistory
     latest_time_(current_time),
     max_time_length_(max_time_length)
   {
-    const auto s_ptr = state.data_ptr();
-    for (size_t d = 0; d < state_dim(); ++d) {
-      data_.push_back(*(s_ptr + d));
-    }
+    data_.push_back(state);
   }
 
   /**
@@ -169,7 +150,7 @@ struct AgentHistory
    */
   AgentHistory(
     const std::string & object_id, const size_t label_index, const size_t max_time_length)
-  : data_(max_time_length * state_dim()),
+  : data_(max_time_length),
     object_id_(object_id),
     label_index_(label_index),
     latest_time_(-std::numeric_limits<float>::max()),
@@ -182,12 +163,6 @@ struct AgentHistory
 
   // Return the number of agent state dimensions `D`.
   static size_t state_dim() { return AgentStateDim; }
-
-  // Return the data size of history `T * D`.
-  size_t size() const { return max_time_length_ * state_dim(); }
-
-  // Return the shape of history matrix ordering in `(T, D)`.
-  std::tuple<size_t, size_t> shape() const { return {max_time_length_, state_dim()}; }
 
   // Return the object id.
   const std::string & object_id() const { return object_id_; }
@@ -209,13 +184,7 @@ struct AgentHistory
    */
   void update(const float current_time, AgentState & state) noexcept
   {
-    // remove the state at the oldest timestamp
-    data_.erase(data_.begin(), data_.begin() + state_dim());
-
-    const auto s = state.data_ptr();
-    for (size_t d = 0; d < state_dim(); ++d) {
-      data_.push_back(*(s + d));
-    }
+    data_.push_back(state);
     latest_time_ = current_time;
   }
 
@@ -223,16 +192,9 @@ struct AgentHistory
   void update_empty() noexcept
   {
     // remove the state at the oldest timestamp
-    data_.erase(data_.begin(), data_.begin() + state_dim());
-
-    const auto s = AgentState::empty().data_ptr();
-    for (size_t d = 0; d < state_dim(); ++d) {
-      data_.push_back(*(s + d));
-    }
+    auto state = AgentState();
+    data_.push_back(state);
   }
-
-  // Return the address pointer of data array.
-  const float * data_ptr() const noexcept { return data_.data(); }
 
   /**
    * @brief Check whether the latest valid state is too old or not.
@@ -257,14 +219,21 @@ struct AgentHistory
   bool is_valid_latest() const { return get_latest_state().is_valid(); }
 
   // Get the latest agent state at `T`.
-  AgentState get_latest_state() const
+  const AgentState & get_latest_state() const { return *data_.end(); }
+
+  std::vector<float> as_array() const noexcept
   {
-    const auto & latest_itr = (data_.begin() + state_dim() * (max_time_length_ - 1));
-    return AgentState(latest_itr);
+    std::vector<float> output;
+    for (const auto & state : data_) {
+      for (const auto & s : state.as_array()) {
+        output.emplace_back(s);
+      }
+    }
+    return output;
   }
 
 private:
-  std::vector<float> data_;
+  FixedQueue<AgentState> data_;
   const std::string object_id_;
   const size_t label_index_;
   float latest_time_;
@@ -280,30 +249,27 @@ struct AgentData
    * @brief Construct a new instance.
    *
    * @param histories An array of histories for each object.
-   * @param sdc_index An index of ego.
+   * @param ego_index An index of ego.
    * @param target_index Indices of target agents.
    * @param label_index An array of label indices for each object.
    * @param timestamps An array of timestamps.
    */
   AgentData(
-    const std::vector<AgentHistory> & histories, const size_t sdc_index,
+    const std::vector<AgentHistory> & histories, const size_t ego_index,
     const std::vector<size_t> & target_index, const std::vector<size_t> & label_index,
     const std::vector<float> & timestamps)
   : num_target_(target_index.size()),
     num_agent_(histories.size()),
     time_length_(timestamps.size()),
-    sdc_index_(sdc_index),
+    sdc_index_(ego_index),
     target_index_(target_index),
     label_index_(label_index),
     timestamps_(timestamps)
   {
     data_.reserve(num_agent_ * time_length_ * state_dim());
     for (auto & history : histories) {
-      const auto data_ptr = history.data_ptr();
-      for (size_t t = 0; t < time_length_; ++t) {
-        for (size_t d = 0; d < state_dim(); ++d) {
-          data_.push_back(*(data_ptr + t * state_dim() + d));
-        }
+      for (const auto & s : history.as_array()) {
+        data_.emplace_back(s);
       }
     }
 
@@ -311,18 +277,14 @@ struct AgentData
     target_label_index_.reserve(num_target_);
     for (const auto & idx : target_index) {
       target_label_index_.emplace_back(label_index.at(idx));
-      const auto target_ptr = histories.at(idx).data_ptr();
-      for (size_t d = 0; d < state_dim(); ++d) {
-        target_data_.push_back(*(target_ptr + (time_length_ - 1) * state_dim() + d));
+      for (const auto & s : histories.at(idx).as_array()) {
+        target_data_.emplace_back(s);
       }
     }
 
     ego_data_.reserve(time_length_ * state_dim());
-    const auto ego_data_ptr = histories.at(sdc_index).data_ptr();
-    for (size_t t = 0; t < time_length_; ++t) {
-      for (size_t d = 0; d < state_dim(); ++d) {
-        ego_data_.push_back(*(ego_data_ptr + t * state_dim() + d));
-      }
+    for (const auto & s : histories.at(ego_index).as_array()) {
+      ego_data_.emplace_back(s);
     }
   }
 
