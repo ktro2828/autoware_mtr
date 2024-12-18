@@ -123,7 +123,7 @@ private:
     const float current_time, const TrackedObjects::ConstSharedPtr objects_msg);
 
   // Extract ego state stored in the buffer which has the nearest timestamp from current timestamp.
-  AgentState extractNearestEgo(const float current_time) const;
+  AgentState getCurrentEgoState(const float current_time) const;
 
   [[nodiscard]] TrackedObject makeEgoTrackedObject(const Odometry::ConstSharedPtr ego_msg) const;
 
@@ -136,7 +136,7 @@ private:
   std::vector<float> getRelativeTimestamps() const;
 
   // Generate `PredictedObject` from `PredictedTrajectory`.
-  PredictedObject generatePredictedObject(
+  PredictedObject createPredictedObject(
     const TrackedObject & object, const PredictedTrajectory & trajectory);
 
   // ROS Publisher and Subscriber

@@ -83,7 +83,7 @@ void insertLanePoints(const std::vector<LanePoint> & src, std::vector<LanePoint>
 }
 
 // Convert `TrackedObject` to `AgentState`.
-AgentState trackedObjectToAgentState(const TrackedObject & object, const bool is_valid)
+AgentState createAgentState(const TrackedObject & object, const bool is_valid)
 {
   const auto & pose = object.kinematics.pose_with_covariance.pose;
   const auto & twist = object.kinematics.twist_with_covariance.twist;
@@ -330,7 +330,7 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
     const auto & object = object_msg_map_.at(object_id);
     const auto & trajectory = trajectories.at(i);
 
-    auto predicted_object = generatePredictedObject(object, trajectory);
+    auto predicted_object = createPredictedObject(object, trajectory);
     output.objects.emplace_back(predicted_object);
   }
 
@@ -495,7 +495,7 @@ void MTRNode::updateAgentHistory(
     } else {
       object_msg_map_.at(object_id) = object;
     }
-    auto state = trackedObjectToAgentState(object, true);
+    auto state = createAgentState(object, true);
 
     if (agent_history_map_.count(object_id) == 0) {
       AgentHistory history(object_id, label_index, config_ptr_->num_past);
@@ -526,7 +526,7 @@ void MTRNode::updateAgentHistory(
   }
 }
 
-AgentState MTRNode::extractNearestEgo(const float current_time) const
+AgentState MTRNode::getCurrentEgoState(const float current_time) const
 {
   auto state = std::min_element(
     ego_states_->begin(), ego_states_->end(), [&](const auto & s1, const auto & s2) {
@@ -591,7 +591,7 @@ std::vector<float> MTRNode::getRelativeTimestamps() const
   return output;
 }
 
-PredictedObject MTRNode::generatePredictedObject(
+PredictedObject MTRNode::createPredictedObject(
   const TrackedObject & object, const PredictedTrajectory & trajectory)
 {
   const auto & init_pose_with_cov = object.kinematics.pose_with_covariance;
