@@ -20,11 +20,9 @@
 #include <lanelet2_extension/utility/message_conversion.hpp>
 #include <rclcpp/logging.hpp>
 
-#include <geometry_msgs/msg/detail/pose__struct.hpp>
-#include <geometry_msgs/msg/detail/twist__struct.hpp>
-#include <geometry_msgs/msg/detail/twist_with_covariance__struct.hpp>
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/vector3.hpp>
 
 #include <tf2/utils.h>
 
@@ -90,23 +88,12 @@ AgentState trackedObjectToAgentState(const TrackedObject & object, const bool is
   const auto & pose = object.kinematics.pose_with_covariance.pose;
   const auto & twist = object.kinematics.twist_with_covariance.twist;
   const auto & accel = object.kinematics.acceleration_with_covariance.accel;
-  const auto & dimensions = object.shape.dimensions;
-  const auto yaw = tf2::getYaw(pose.orientation);
-  const auto valid = is_valid ? 1.0f : 0.0f;
+  const auto & dimension = object.shape.dimensions;
 
-  return {
-    static_cast<float>(pose.position.x),
-    static_cast<float>(pose.position.y),
-    static_cast<float>(pose.position.z),
-    static_cast<float>(dimensions.x),
-    static_cast<float>(dimensions.y),
-    static_cast<float>(dimensions.z),
-    static_cast<float>(yaw),
-    static_cast<float>(twist.linear.x),
-    static_cast<float>(twist.linear.y),
-    static_cast<float>(accel.linear.x),
-    static_cast<float>(accel.linear.y),
-    valid};
+  const float yaw = tf2::getYaw(pose.orientation);
+  const float valid = is_valid ? 1.0f : 0.0f;
+
+  return {pose.position, dimension, yaw, twist.linear, accel.linear, valid};
 }
 
 // Get the label index corresponding to AgentLabel. If the label of tracked object is not * defined
@@ -371,26 +358,26 @@ bool MTRNode::fetchData()
   const auto current_time = static_cast<float>(rclcpp::Time(ego_msg->header.stamp).seconds());
   const auto & position = ego_msg->pose.pose.position;
   const auto & twist = ego_msg->twist.twist;
-  const auto yaw = static_cast<float>(tf2::getYaw(ego_msg->pose.pose.orientation));
-  float ax = 0.0f;
-  float ay = 0.0f;
-
-  const auto latest_state = ego_states_->end();
-  const auto time_diff = current_time - latest_state->first;
-  ax = (static_cast<float>(twist.linear.x) - latest_state->second.vx()) / (time_diff + 1e-10f);
-  ay = static_cast<float>(twist.linear.y) - latest_state->second.vy() / (time_diff + 1e-10f);
+  const float yaw = tf2::getYaw(ego_msg->pose.pose.orientation);
 
   const auto & ego_length = vehicle_info_.vehicle_length_m;
   const auto & ego_width = vehicle_info_.vehicle_width_m;
   const auto & ego_height = vehicle_info_.vehicle_height_m;
 
+  const auto dimension =
+    geometry_msgs::build<geometry_msgs::msg::Vector3>().x(ego_length).y(ego_width).z(ego_height);
+
+  const auto latest_state = ego_states_->end();
+  const auto time_diff = current_time - latest_state->first;
+
+  const auto acceleration =
+    geometry_msgs::build<geometry_msgs::msg::Vector3>()
+      .x((twist.linear.x - latest_state->second.vx()) / (time_diff + 1e-10f))
+      .y((twist.linear.y - latest_state->second.vy()) / (time_diff + 1e-10f))
+      .z(0.0f);
+
   ego_states_->push_back(std::make_pair(
-    current_time,
-    AgentState(
-      static_cast<float>(position.x), static_cast<float>(position.y),
-      static_cast<float>(position.z), static_cast<float>(ego_length), static_cast<float>(ego_width),
-      static_cast<float>(ego_height), yaw, static_cast<float>(twist.linear.x),
-      static_cast<float>(twist.linear.y), ax, ay, true)));
+    current_time, AgentState(position, dimension, yaw, twist.linear, acceleration, 1.0f)));
 
   // make the ego vehicle a tracked object
   ego_tracked_object_ = makeEgoTrackedObject(ego_msg);
