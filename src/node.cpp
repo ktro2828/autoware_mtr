@@ -14,7 +14,11 @@
 
 #include "autoware/mtr/node.hpp"
 
+#include "autoware/mtr/agent.hpp"
+#include "autoware/mtr/fixed_queue.hpp"
+
 #include <lanelet2_extension/utility/message_conversion.hpp>
+#include <rclcpp/logging.hpp>
 
 #include <geometry_msgs/msg/detail/pose__struct.hpp>
 #include <geometry_msgs/msg/detail/twist__struct.hpp>
@@ -195,6 +199,13 @@ MTRNode::MTRNode(const rclcpp::NodeOptions & node_options)
     model_ptr_ = std::make_unique<TrtMTR>(model_path, *config_ptr_, *build_config_ptr_);
   }
 
+  {
+    // Ego states and timestamps buffer
+    int ego_buffer_size = declare_parameter<int>("ego_buffer_size", 100);
+    ego_states_ = std::make_unique<FixedQueue<std::pair<float, AgentState>>>(ego_buffer_size);
+    timestamps_ = std::make_unique<FixedQueue<double>>(config_ptr_->num_past);
+  }
+
   sub_objects_ = create_subscription<TrackedObjects>(
     "~/input/objects", rclcpp::QoS{1}, std::bind(&MTRNode::callback, this, std::placeholders::_1));
   sub_map_ = create_subscription<HADMapBin>(
@@ -277,17 +288,8 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
     return;
   }
 
-  const auto current_time = static_cast<float>(rclcpp::Time(object_msg->header.stamp).seconds());
-
-  timestamps_.emplace_back(current_time);
-  // TODO(ktro2828): update timestamps
-  if (timestamps_.size() < config_ptr_->num_past) {
-    RCLCPP_WARN(get_logger(), "Not enough timestamp");
-    return;  // Not enough timestamps
-  }
-  if (config_ptr_->num_past < timestamps_.size()) {
-    timestamps_.erase(timestamps_.begin(), timestamps_.begin() + 1);
-  }
+  const auto current_time = rclcpp::Time(object_msg->header.stamp).seconds();
+  timestamps_->push_back(current_time);
 
   removeAncientAgentHistory(current_time, object_msg);
   updateAgentHistory(current_time, object_msg);
@@ -372,29 +374,24 @@ bool MTRNode::fetchData()
   const auto yaw = static_cast<float>(tf2::getYaw(ego_msg->pose.pose.orientation));
   float ax = 0.0f;
   float ay = 0.0f;
-  if (!ego_states_.empty()) {
-    const auto & latest_state = ego_states_.back();
-    const auto time_diff = current_time - latest_state.first;
-    ax = (static_cast<float>(twist.linear.x) - latest_state.second.vx()) / (time_diff + 1e-10f);
-    ay = static_cast<float>(twist.linear.y) - latest_state.second.vy() / (time_diff + 1e-10f);
-  }
+
+  const auto latest_state = ego_states_->end();
+  const auto time_diff = current_time - latest_state->first;
+  ax = (static_cast<float>(twist.linear.x) - latest_state->second.vx()) / (time_diff + 1e-10f);
+  ay = static_cast<float>(twist.linear.y) - latest_state->second.vy() / (time_diff + 1e-10f);
 
   const auto & ego_length = vehicle_info_.vehicle_length_m;
   const auto & ego_width = vehicle_info_.vehicle_width_m;
   const auto & ego_height = vehicle_info_.vehicle_height_m;
 
-  ego_states_.emplace_back(
+  ego_states_->push_back(std::make_pair(
     current_time,
     AgentState(
       static_cast<float>(position.x), static_cast<float>(position.y),
       static_cast<float>(position.z), static_cast<float>(ego_length), static_cast<float>(ego_width),
       static_cast<float>(ego_height), yaw, static_cast<float>(twist.linear.x),
-      static_cast<float>(twist.linear.y), ax, ay, true));
+      static_cast<float>(twist.linear.y), ax, ay, true)));
 
-  constexpr size_t max_buffer_size = 100;
-  if (max_buffer_size < ego_states_.size()) {
-    ego_states_.erase(ego_states_.begin(), ego_states_.begin());
-  }
   // make the ego vehicle a tracked object
   ego_tracked_object_ = makeEgoTrackedObject(ego_msg);
   return true;
@@ -543,7 +540,7 @@ void MTRNode::updateAgentHistory(
 AgentState MTRNode::extractNearestEgo(const float current_time) const
 {
   auto state = std::min_element(
-    ego_states_.cbegin(), ego_states_.cend(), [&](const auto & s1, const auto & s2) {
+    ego_states_->begin(), ego_states_->end(), [&](const auto & s1, const auto & s2) {
       return std::abs(s1.first - current_time) < std::abs(s2.first - current_time);
     });
   return state->second;
@@ -601,9 +598,9 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
 std::vector<float> MTRNode::getRelativeTimestamps() const
 {
   std::vector<float> output;
-  output.reserve(timestamps_.size());
-  for (auto & t : output) {
-    output.push_back(t - timestamps_.at(0));
+  output.reserve(timestamps_->size());
+  for (auto & t : *timestamps_) {
+    output.push_back(t - *timestamps_->begin());
   }
   return output;
 }
