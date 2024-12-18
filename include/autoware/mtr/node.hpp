@@ -16,6 +16,7 @@
 #define AUTOWARE__MTR__NODE_HPP_
 
 #include "autoware/mtr/agent.hpp"
+#include "autoware/mtr/conversions/lanelet.hpp"
 #include "autoware/mtr/fixed_queue.hpp"
 #include "autoware/mtr/polyline.hpp"
 #include "autoware/mtr/trajectory.hpp"
@@ -63,37 +64,6 @@ using autoware_perception_msgs::msg::PredictedPath;
 using autoware_perception_msgs::msg::TrackedObject;
 using autoware_perception_msgs::msg::TrackedObjects;
 using nav_msgs::msg::Odometry;
-
-class PolylineTypeMap
-{
-public:
-  explicit PolylineTypeMap(rclcpp::Node * node)
-  {
-    const auto filepath = node->declare_parameter<std::string>("model_params.polyline_label_path");
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-      RCLCPP_ERROR_STREAM(node->get_logger(), "Could not open polyline label file: " << filepath);
-      rclcpp::shutdown();
-    }
-
-    int label_index = 0;
-    std::string label;
-    while (getline(file, label)) {
-      label_map_.insert({label, label_index});
-      ++label_index;
-    }
-  }
-
-  // Return the ID of the corresponding label type. If specified type is not contained in map,
-  // return `-1`.
-  [[nodiscard]] int getTypeID(const std::string & type) const
-  {
-    return label_map_.count(type) == 0 ? -1 : label_map_.at(type);
-  }
-
-private:
-  std::map<std::string, size_t> label_map_;
-};  // class PolylineTypeMap
 
 class MTRNode : public rclcpp::Node
 {
@@ -150,6 +120,7 @@ private:
   std::shared_ptr<lanelet::LaneletMap> lanelet_map_ptr_;
   std::shared_ptr<lanelet::routing::RoutingGraph> routing_graph_ptr_;
   std::shared_ptr<lanelet::traffic_rules::TrafficRules> traffic_rules_ptr_;
+  std::unique_ptr<LaneletConverter> lanelet_converter_ptr_;
 
   // Agent history
   std::map<std::string, AgentHistory> agent_history_map_;
@@ -163,8 +134,6 @@ private:
   std::unique_ptr<MTRConfig> config_ptr_;
   std::unique_ptr<BuildConfig> build_config_ptr_;
   std::unique_ptr<TrtMTR> model_ptr_;
-  PolylineTypeMap polyline_type_map_;
-  std::shared_ptr<PolylineData> polyline_ptr_;
 
   std::unique_ptr<FixedQueue<std::pair<float, AgentState>>> ego_states_;
   std::unique_ptr<FixedQueue<double>> timestamps_;
