@@ -122,39 +122,6 @@ int getLabelIndex(const TrackedObject & object)
   }
   return -1;  // other labels
 }
-
-// Return corresponding PrecisionType from string.
-PrecisionType getPrecisionType(const std::string & name)
-{
-  if (name == "FP32") {
-    return PrecisionType::FP32;
-  }
-  if (name == "FP16") {
-    return PrecisionType::FP16;
-  }
-  if (name == "INT8") {
-    return PrecisionType::INT8;
-  }
-  throw std::invalid_argument("Invalid precision name.");
-}
-
-// Return corresponding CalibrationType from string.
-CalibrationType getCalibrationType(const std::string & name)
-{
-  if (name == "ENTROPY") {
-    return CalibrationType::ENTROPY;
-  }
-  if (name == "LEGACY") {
-    return CalibrationType::LEGACY;
-  }
-  if (name == "PERCENTILE") {
-    return CalibrationType::PERCENTILE;
-  }
-  if (name == "MINMAX") {
-    return CalibrationType::MINMAX;
-  }
-  throw std::invalid_argument("Invalid calibration name.");
-}
 }  // namespace
 
 MTRNode::MTRNode(const rclcpp::NodeOptions & node_options)
@@ -184,10 +151,8 @@ MTRNode::MTRNode(const rclcpp::NodeOptions & node_options)
       point_break_distance, intention_point_filepath, num_intention_point_cluster);
     // Build config
     const auto is_dynamic = declare_parameter<bool>("build_params.is_dynamic");
-    const auto precision_str = declare_parameter<std::string>("build_params.precision");
-    const auto calibration_str = declare_parameter<std::string>("build_params.calibration");
-    const auto precision = getPrecisionType(precision_str);
-    const auto calibration = getCalibrationType(calibration_str);
+    const auto precision = declare_parameter<std::string>("build_params.precision");
+    const auto calibration = declare_parameter<std::string>("build_params.calibration");
     build_config_ptr_ = std::make_unique<BuildConfig>(is_dynamic, precision, calibration);
     model_ptr_ = std::make_unique<TrtMTR>(model_path, *config_ptr_, *build_config_ptr_);
   }
