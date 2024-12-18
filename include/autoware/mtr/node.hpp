@@ -31,6 +31,7 @@
 
 #include <autoware_map_msgs/msg/detail/lanelet_map_bin__struct.hpp>
 #include <autoware_map_msgs/msg/lanelet_map_bin.hpp>
+#include <autoware_perception_msgs/msg/detail/tracked_object__struct.hpp>
 #include <autoware_perception_msgs/msg/object_classification.hpp>
 #include <autoware_perception_msgs/msg/predicted_object_kinematics.hpp>
 #include <autoware_perception_msgs/msg/predicted_objects.hpp>
@@ -45,6 +46,7 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -99,7 +101,7 @@ public:
   explicit MTRNode(const rclcpp::NodeOptions & node_options);
 
   // Object ID of the ego vehicle
-  const std::string EGO_ID{"EGO"};
+  inline static const std::string EGO_ID{"EGO"};
 
 private:
   // Main callback being invoked when the tracked objects topic is subscribed.
@@ -109,23 +111,19 @@ private:
   void onMap(const HADMapBin::ConstSharedPtr map_msg);
 
   // Fetch data of Ego's odometry topic.
-  bool fetchData();
+  std::optional<TrackedObject> getLatestEgo();
 
   // Convert Lanelet to `PolylineData`.
   bool convertLaneletToPolyline();
 
   // Remove ancient agent histories.
   void removeAncientAgentHistory(
-    const float current_time, const TrackedObjects::ConstSharedPtr objects_msg);
+    const double current_time, const TrackedObjects::ConstSharedPtr objects_msg);
 
   // Appends new states to history.
   void updateAgentHistory(
-    const float current_time, const TrackedObjects::ConstSharedPtr objects_msg);
-
-  // Extract ego state stored in the buffer which has the nearest timestamp from current timestamp.
-  AgentState extractNearestEgo(const float current_time) const;
-
-  [[nodiscard]] TrackedObject makeEgoTrackedObject(const Odometry::ConstSharedPtr ego_msg) const;
+    const double current_time, const TrackedObjects::ConstSharedPtr objects_msg,
+    const TrackedObject & ego_msg);
 
   // Extract target agents and return corresponding indices.
   // NOTE: Extract targets in order of proximity, closest first.
@@ -136,7 +134,7 @@ private:
   std::vector<float> getRelativeTimestamps() const;
 
   // Generate `PredictedObject` from `PredictedTrajectory`.
-  PredictedObject generatePredictedObject(
+  PredictedObject createPredictedObject(
     const TrackedObject & object, const PredictedTrajectory & trajectory);
 
   // ROS Publisher and Subscriber
@@ -156,7 +154,6 @@ private:
   // Agent history
   std::map<std::string, AgentHistory> agent_history_map_;
   std::map<std::string, TrackedObject> object_msg_map_;
-  TrackedObject ego_tracked_object_;
   VehicleInfo vehicle_info_;
 
   // Pose transform listener
