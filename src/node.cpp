@@ -297,16 +297,19 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
     }
   }
 
-  if (sdc_index == -1) {
-    RCLCPP_WARN(get_logger(), "No EGO");
-    return;
-  }
+  // if (sdc_index == -1) {
+  //   RCLCPP_WARN(get_logger(), "No EGO");
+  //   return;
+  // }
 
   const auto target_indices = extractTargetAgent(histories);
   if (target_indices.empty()) {
     RCLCPP_WARN(get_logger(), "No target agents");
     return;
   }
+
+  // TODO(ktro2828)
+  return;
 
   const auto relative_timestamps = getRelativeTimestamps();
   AgentData agent_data(
@@ -478,7 +481,6 @@ void MTRNode::removeAncientAgentHistory(
 void MTRNode::updateAgentHistory(
   const float current_time, const TrackedObjects::ConstSharedPtr objects_msg)
 {
-  // TODO(ktro2828): use ego info
   std::vector<std::string> observed_ids;
   for (const auto & object : objects_msg->objects) {
     auto label_index = getLabelIndex(object);
@@ -504,16 +506,16 @@ void MTRNode::updateAgentHistory(
     }
   }
 
-  auto ego_state = extractNearestEgo(current_time);
-  if (agent_history_map_.count(EGO_ID) == 0) {
-    AgentHistory history(EGO_ID, AgentLabel::VEHICLE, config_ptr_->num_past);
-    history.update(current_time, ego_state);
-    agent_history_map_.emplace(EGO_ID, history);
-  } else {
-    agent_history_map_.at(EGO_ID).update(current_time, ego_state);
-  }
-  observed_ids.emplace_back(EGO_ID);
-  object_msg_map_.emplace(EGO_ID, ego_tracked_object_);
+  // auto ego_state = extractNearestEgo(current_time);
+  // if (agent_history_map_.count(EGO_ID) == 0) {
+  //   AgentHistory history(EGO_ID, AgentLabel::VEHICLE, config_ptr_->num_past);
+  //   history.update(current_time, ego_state);
+  //   agent_history_map_.emplace(EGO_ID, history);
+  // } else {
+  //   agent_history_map_.at(EGO_ID).update(current_time, ego_state);
+  // }
+  // observed_ids.emplace_back(EGO_ID);
+  // object_msg_map_.emplace(EGO_ID, ego_tracked_object_);
 
   // update unobserved histories with empty
   for (auto & [object_id, history] : agent_history_map_) {
@@ -535,20 +537,18 @@ AgentState MTRNode::extractNearestEgo(const float current_time) const
 
 std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> & histories)
 {
-  std::vector<std::pair<size_t, float>> distances;
+  auto map2ego = transform_listener_.getTransform(
+    "base_link", "map", rclcpp::Time(), rclcpp::Duration::from_seconds(0.1));
+
+  if (!map2ego) {
+    RCLCPP_WARN(get_logger(), "Failed to get transform from map to base_link.");
+    return {};
+  }
+
+  std::vector<std::pair<size_t, double>> index_distances;
   for (size_t i = 0; i < histories.size(); ++i) {
     const auto & history = histories.at(i);
-    if (!history.is_valid_latest() || history.object_id() == EGO_ID) {
-      distances.emplace_back(i, INFINITY);
-    } else {
-      auto map2ego = transform_listener_.getTransform(
-        "base_link",  // target
-        "map",        // src
-        rclcpp::Time(), rclcpp::Duration::from_seconds(0.1));
-      if (!map2ego) {
-        RCLCPP_WARN(get_logger(), "Failed to get transform from map to base_link.");
-        return {};
-      }
+    if (history.is_valid_latest() && history.object_id() != EGO_ID) {
       const auto state = history.get_latest_state();
       geometry_msgs::msg::PoseStamped pose_in_map;
       pose_in_map.pose.position.x = state.x();
@@ -559,20 +559,19 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
       geometry_msgs::msg::PoseStamped pose_in_ego;
       tf2::doTransform(pose_in_map, pose_in_ego, *map2ego);
 
-      const auto dist = std::hypot(
-        pose_in_ego.pose.position.x, pose_in_ego.pose.position.y, pose_in_ego.pose.position.z);
-      distances.emplace_back(i, dist);
+      const auto distance = std::hypot(pose_in_ego.pose.position.x, pose_in_ego.pose.position.y);
+      index_distances.emplace_back(i, distance);
     }
   }
 
-  std::sort(distances.begin(), distances.end(), [](const auto & item1, const auto & item2) {
-    return item1.second < item2.second;
-  });
+  // sort by distance
+  std::sort(
+    index_distances.begin(), index_distances.end(),
+    [](const auto & item1, const auto & item2) { return item1.second < item2.second; });
 
   constexpr size_t max_target_size = 2;  // TODO(ktro2828): use a parameter
   std::vector<size_t> target_indices;
-  target_indices.reserve(max_target_size);
-  for (const auto & [idx, _] : distances) {
+  for (const auto & [idx, _] : index_distances) {
     target_indices.emplace_back(idx);
     if (max_target_size <= target_indices.size()) {
       break;
