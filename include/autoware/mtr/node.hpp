@@ -16,6 +16,7 @@
 #define AUTOWARE__MTR__NODE_HPP_
 
 #include "autoware/mtr/agent.hpp"
+#include "autoware/mtr/fixed_queue.hpp"
 #include "autoware/mtr/polyline.hpp"
 #include "autoware/mtr/trajectory.hpp"
 #include "autoware/mtr/trt_mtr.hpp"
@@ -167,8 +168,9 @@ private:
   std::unique_ptr<TrtMTR> model_ptr_;
   PolylineTypeMap polyline_type_map_;
   std::shared_ptr<PolylineData> polyline_ptr_;
-  std::vector<std::pair<float, AgentState>> ego_states_;
-  std::vector<double> timestamps_;
+
+  std::unique_ptr<FixedQueue<std::pair<float, AgentState>>> ego_states_;
+  std::unique_ptr<FixedQueue<double>> timestamps_;
 };  // class MTRNode
 }  // namespace autoware::mtr
 #endif  // AUTOWARE__MTR__NODE_HPP_
