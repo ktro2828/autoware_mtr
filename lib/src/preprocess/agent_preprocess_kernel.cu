@@ -124,10 +124,12 @@ cudaError_t agentPreprocessLauncher(
     return cudaError::cudaErrorInvalidValue;
   }
 
-  // TODO: update the number of blocks and threads to guard from `cudaErrorIllegalAccess`
-  constexpr int threadsPerBlock = 256;
-  dim3 blocks(B, N, T);
-  agentPreprocessKernel<<<blocks, threadsPerBlock, 0, stream>>>(
+  dim3 threads(8, 8, 8);
+  dim3 blocks(
+    (B + threads.x - 1) / threads.x, (N + threads.y - 1) / threads.y,
+    (T + threads.z - 1) / threads.z);
+
+  agentPreprocessKernel<<<blocks, threads, 0, stream>>>(
     B, N, T, D, C, sdc_index, target_index, object_type_index, timestamps, in_trajectory, out_data,
     out_mask, out_last_pos);
 

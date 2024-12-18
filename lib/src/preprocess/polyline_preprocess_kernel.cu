@@ -53,6 +53,7 @@ __global__ void transformPolylineKernel(
     const float dx = inPolyline[inIdx + 3];
     const float dy = inPolyline[inIdx + 4];
     const float dz = inPolyline[inIdx + 5];
+    const float typeID = inPolyline[inIdx + 6];
 
     const int centerIdx = b * AgentDim;
     const float centerX = targetState[centerIdx];
@@ -76,6 +77,7 @@ __global__ void transformPolylineKernel(
     outPolyline[outIdx * (PointDim + 2) + 3] = transDx;
     outPolyline[outIdx * (PointDim + 2) + 4] = transDy;
     outPolyline[outIdx * (PointDim + 2) + 5] = transDz;
+    outPolyline[outIdx * (PointDim + 2) + 6] = typeID;
   }
 }
 
@@ -218,30 +220,34 @@ cudaError_t polylinePreprocessWithTopkLauncher(
     return cudaError_t::cudaErrorInvalidValue;
   }
 
-  const int outPointDim = PointDim + 2;
+  const int outPointDim = PointDim + 2;  // 9
 
-  // TODO: update the number of blocks and threads to guard from `cudaErrorIllegalAccess`
-  constexpr int threadsPerBlock = 256;
-  const dim3 blocks1(B, L, P);
-  transformPolylineKernel<<<blocks1, threadsPerBlock, 0, stream>>>(
+  constexpr dim3 threads(8, 8, 8);
+
+  const dim3 blocks1(
+    (B + threads.x - 1) / threads.x, (L + threads.y - 1) / threads.y,
+    (P + threads.z - 1) / threads.z);
+  transformPolylineKernel<<<blocks1, threads, 0, stream>>>(
     L, P, PointDim, inPolyline, B, AgentDim, targetState, tmpPolyline, tmpPolylineMask);
 
-  const dim3 blocks2(B, L);
-  calculateCenterDistanceKernel<<<blocks2, threadsPerBlock, 0, stream>>>(
+  const dim3 blocks2((B + threads.x - 1) / threads.x, (L + threads.y - 1) / threads.y);
+  calculateCenterDistanceKernel<<<blocks2, threads, 0, stream>>>(
     B, L, P, outPointDim, tmpPolyline, tmpPolylineMask, tmpDistance);
 
-  const dim3 blocks3(B, P, outPointDim);
-  const size_t sharedMemSize = sizeof(float) * L;
-  extractTopKPolylineKernel<<<blocks3, threadsPerBlock, sharedMemSize, stream>>>(
+  const dim3 blocks3(
+    (B + threads.x - 1) / threads.x, (P + threads.y - 1) / threads.y,
+    (outPointDim + threads.z - 1) / threads.z);
+  extractTopKPolylineKernel<<<blocks3, threads, sizeof(float) * L, stream>>>(
     K, B, L, P, outPointDim, tmpPolyline, tmpPolylineMask, tmpDistance, outPolyline,
     outPolylineMask);
 
-  const dim3 blocks4(B, K, P);
-  setPreviousPositionKernel<<<blocks4, threadsPerBlock, 0, stream>>>(
-    B, K, P, outPointDim, outPolyline);
+  const dim3 blocks4(
+    (B + threads.x - 1) / threads.x, (K + threads.y - 1) / threads.y,
+    (P + threads.z - 1) / threads.z);
+  setPreviousPositionKernel<<<blocks4, threads, 0, stream>>>(B, K, P, outPointDim, outPolyline);
 
-  const dim3 blocks5(B, K);
-  calculatePolylineCenterKernel<<<blocks5, threadsPerBlock, 0, stream>>>(
+  const dim3 blocks5((B + threads.x - 1) / threads.x, (K + threads.y - 1) / threads.y);
+  calculatePolylineCenterKernel<<<blocks5, threads, 0, stream>>>(
     B, K, P, outPointDim, outPolyline, outPolylineMask, outPolylineCenter);
 
   return cudaGetLastError();
@@ -252,19 +258,19 @@ cudaError_t polylinePreprocessLauncher(
   const int AgentDim, const float * targetState, float * outPolyline, bool * outPolylineMask,
   float * outPolylineCenter, cudaStream_t stream)
 {
-  const int outPointDim = PointDim + 2;
+  const int outPointDim = PointDim + 2;  // 9
 
-  // TODO: update the number of blocks and threads to guard from `cudaErrorIllegalAccess`
-  constexpr int threadsPerBlock = 256;
-  const dim3 block3d(B, K, P);
-  transformPolylineKernel<<<block3d, threadsPerBlock, 0, stream>>>(
+  constexpr dim3 threads(8, 8, 8);
+  const dim3 block3d(
+    (B + threads.x - 1) / threads.x, (K + threads.y - 1) / threads.y,
+    (P + threads.z - 1) / threads.z);
+  transformPolylineKernel<<<block3d, threads, 0, stream>>>(
     K, P, PointDim, inPolyline, B, AgentDim, targetState, outPolyline, outPolylineMask);
 
-  setPreviousPositionKernel<<<block3d, threadsPerBlock, 0, stream>>>(
-    B, K, P, outPointDim, outPolyline);
+  setPreviousPositionKernel<<<block3d, threads, 0, stream>>>(B, K, P, outPointDim, outPolyline);
 
-  const dim3 block2d(B, K);
-  calculatePolylineCenterKernel<<<block2d, threadsPerBlock, 0, stream>>>(
+  const dim3 block2d((B + threads.x - 1) / threads.x, (K + threads.y - 1) / threads.y);
+  calculatePolylineCenterKernel<<<block2d, threads, 0, stream>>>(
     B, K, P, outPointDim, outPolyline, outPolylineMask, outPolylineCenter);
 
   return cudaGetLastError();
