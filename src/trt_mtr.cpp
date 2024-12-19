@@ -207,13 +207,14 @@ bool TrtMTR::postProcess(
     sizeof(float) * num_target_ * num_mode_ * num_future_ * PredictedStateDim,
     cudaMemcpyDeviceToHost, stream_));
 
+  trajectories.clear();
   trajectories.reserve(num_target_);
   for (auto b = 0; b < num_target_; ++b) {
     const auto score_itr = h_out_score_.cbegin() + b * num_mode_;
-    std::vector<float> scores(score_itr, score_itr + num_mode_);
+    std::vector<double> scores(score_itr, score_itr + num_mode_);
     const auto mode_itr =
       h_out_trajectory_.cbegin() + b * num_mode_ * num_future_ * PredictedStateDim;
-    std::vector<float> modes(mode_itr, mode_itr + num_mode_ * num_future_ * PredictedStateDim);
+    std::vector<double> modes(mode_itr, mode_itr + num_mode_ * num_future_ * PredictedStateDim);
     trajectories.emplace_back(scores, modes, num_mode_, num_future_);
   }
   return true;
