@@ -247,19 +247,19 @@ struct AgentData
    *
    * @param histories An array of histories for each object.
    * @param sdc_index An index of ego.
-   * @param target_index Indices of target agents.
+   * @param target_indices Indices of target agents.
    * @param label_ids An array of label indices for each object.
    * @param timestamps An array of timestamps.
    */
   AgentData(
     const std::vector<AgentHistory> & histories, const size_t sdc_index,
-    const std::vector<size_t> & target_index, const std::vector<size_t> & label_ids,
+    const std::vector<size_t> & target_indices, const std::vector<size_t> & label_ids,
     const std::vector<float> & timestamps)
-  : num_target_(target_index.size()),
+  : num_target_(target_indices.size()),
     num_agent_(histories.size()),
     time_length_(timestamps.size()),
     sdc_index_(sdc_index),
-    target_index_(target_index),
+    target_indices_(target_indices),
     label_ids_(label_ids),
     timestamps_(timestamps)
   {
@@ -272,7 +272,7 @@ struct AgentData
 
     target_data_.reserve(num_target_ * state_dim());
     target_label_ids_.reserve(num_target_);
-    for (const auto & idx : target_index) {
+    for (const auto & idx : target_indices) {
       target_label_ids_.emplace_back(label_ids.at(idx));
       for (const auto & v : histories.at(idx).as_array()) {
         target_data_.push_back(v);
@@ -304,7 +304,7 @@ struct AgentData
   int sdc_index() const { return sdc_index_; }
 
   // Return the vector of indices of target agents, in shape `[B]`.
-  const std::vector<size_t> & target_index() const { return target_index_; }
+  const std::vector<size_t> & target_indices() const { return target_indices_; }
 
   // Return the vector of label ids of all agents, in shape `[N]`.
   const std::vector<size_t> & label_ids() const { return label_ids_; }
@@ -341,7 +341,7 @@ private:
   size_t num_agent_;
   size_t time_length_;
   int sdc_index_;
-  std::vector<size_t> target_index_;
+  std::vector<size_t> target_indices_;
   std::vector<size_t> label_ids_;
   std::vector<size_t> target_label_ids_;
   std::vector<float> timestamps_;

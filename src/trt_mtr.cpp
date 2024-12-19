@@ -141,7 +141,7 @@ void TrtMTR::initCudaPtr(const AgentData & agent_data, const PolylineData & poly
 bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyline_data)
 {
   CHECK_CUDA_ERROR(cudaMemcpyAsync(
-    d_target_index_.get(), agent_data.target_index().data(), sizeof(int) * num_target_,
+    d_target_index_.get(), agent_data.target_indices().data(), sizeof(int) * num_target_,
     cudaMemcpyHostToDevice, stream_));
   CHECK_CUDA_ERROR(cudaMemcpyAsync(
     d_label_index_.get(), agent_data.label_ids().data(), sizeof(int) * num_agent_,
