@@ -55,6 +55,7 @@ target_include_directories(${PROJECT_NAME}_cuda_lib PUBLIC
 ament_auto_add_library(${PROJECT_NAME}_lib SHARED
   src/builder.cpp
   src/trt_mtr.cpp
+  src/conversions/lanelet.cpp
 )
 target_link_libraries(${PROJECT_NAME}_lib
   ${TRT_PLUGINS}

@@ -15,6 +15,7 @@
 #include "autoware/mtr/node.hpp"
 
 #include "autoware/mtr/agent.hpp"
+#include "autoware/mtr/conversions/lanelet.hpp"
 #include "autoware/mtr/fixed_queue.hpp"
 
 #include <lanelet2_extension/utility/message_conversion.hpp>
@@ -39,56 +40,10 @@ namespace autoware::mtr
 {
 // TODO(ktro2828): use a parameter
 constexpr double TIME_THRESHOLD = 1.0;
-constexpr size_t MAX_NUM_TARGET = 2;
-
+constexpr size_t MAX_NUM_TARGET = 1;
+constexpr double POLYLINE_DISTANCE_THRESHOLD = 100.0;
 namespace
 {
-// Return the Lanelet subtype name. If input Lanelet has no attribute named `type` return empty
-// string `""`.
-std::string getLaneletSubtype(const lanelet::Lanelet & lanelet)
-{
-  if (!lanelet.hasAttribute("subtype")) {
-    return "";
-  }
-  const auto subtype = lanelet.attribute("subtype").as<std::string>();
-  return subtype ? subtype.get() : "";
-}
-
-// Return the LineString type name. If input LineString has no attribute named `type` return empty
-// string `""`.
-std::string getLineStringType(const lanelet::ConstLineString3d & linestring)
-{
-  if (!linestring.hasAttribute("type")) {
-    return "";
-  }
-  const auto type = linestring.attribute("type").as<std::string>();
-  return type ? type.get() : "";
-}
-
-// Return the LineString subtype name. If input LineString has no attribute named `subtype` return
-// empty string `""`.
-std::string getLineStringSubtype(const lanelet::ConstLineString3d & linestring)
-{
-  if (!linestring.hasAttribute("subtype")) {
-    return "";
-  }
-  const auto subtype = linestring.attribute("subtype").as<std::string>();
-  return subtype ? subtype.get() : "";
-}
-
-// Check whether lanelet has an attribute named `turn_direction`.
-bool isTurnIntersection(const lanelet::Lanelet & lanelet)
-{
-  return (lanelet.hasAttribute("turn_direction"));
-}
-
-// Insert source `LanePoints` into target `LanePoints`.
-void insertLanePoints(const std::vector<LanePoint> & src, std::vector<LanePoint> & dst)
-{
-  dst.reserve(dst.size() * 2);
-  dst.insert(dst.end(), src.cbegin(), src.cend());
-}
-
 // Convert `TrackedObject` to `AgentState`.
 AgentState createAgentState(const TrackedObject & object, const bool is_valid)
 {
@@ -125,7 +80,7 @@ int getLabelIndex(const TrackedObject & object)
 }  // namespace
 
 MTRNode::MTRNode(const rclcpp::NodeOptions & node_options)
-: rclcpp::Node("mtr", node_options), transform_listener_(this), polyline_type_map_(this)
+: rclcpp::Node("mtr", node_options), transform_listener_(this)
 {
   {
     // Build MTR
@@ -186,7 +141,11 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
     RCLCPP_WARN(get_logger(), "No ego data");
     return;
   }
-  if (!polyline_ptr_) {
+
+  const auto polyline_data = lanelet_converter_ptr_->convert(
+    ego_msg->kinematics.pose_with_covariance.pose.position, POLYLINE_DISTANCE_THRESHOLD);
+
+  if (!polyline_data) {
     RCLCPP_WARN(get_logger(), "No polyline");
     return;
   }
@@ -224,15 +183,12 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
     return;
   }
 
-  // TODO(ktro2828)
-  return;
-
   const auto relative_timestamps = getRelativeTimestamps();
   AgentData agent_data(
     histories, static_cast<size_t>(sdc_index), target_indices, label_indices, relative_timestamps);
 
   std::vector<PredictedTrajectory> trajectories;
-  if (!model_ptr_->doInference(agent_data, *polyline_ptr_, trajectories)) {
+  if (!model_ptr_->doInference(agent_data, *polyline_data, trajectories)) {
     RCLCPP_WARN(get_logger(), "Inference failed");
     return;
   }
@@ -260,12 +216,9 @@ void MTRNode::onMap(const HADMapBin::ConstSharedPtr map_msg)
   lanelet::utils::conversion::fromBinMsg(
     *map_msg, lanelet_map_ptr_, &traffic_rules_ptr_, &routing_graph_ptr_);
 
-  RCLCPP_DEBUG(get_logger(), "[TensorRT MTR]: Start converting lanelet to polyline");
-  if (convertLaneletToPolyline()) {
-    RCLCPP_DEBUG(get_logger(), "[TensorRT MTR]: Success to convert lanelet to polyline");
-  } else {
-    RCLCPP_WARN(get_logger(), "[TensorRT MTR]: Fail to convert lanelet to polyline");
-  }
+  lanelet_converter_ptr_ = std::make_unique<LaneletConverter>(
+    lanelet_map_ptr_, config_ptr_->max_num_polyline, config_ptr_->max_num_point,
+    config_ptr_->point_break_distance);
 }
 
 std::optional<TrackedObject> MTRNode::getLatestEgo()
@@ -325,75 +278,6 @@ std::optional<TrackedObject> MTRNode::getLatestEgo()
     output.shape = shape;
   }
   return output;
-}
-
-// TODO(ktro2828): Refactoring lanelet conversion
-bool MTRNode::convertLaneletToPolyline()
-{
-  if (!lanelet_map_ptr_) {
-    return false;
-  }
-
-  std::vector<LanePoint> all_points;
-  for (const auto & lanelet : lanelet_map_ptr_->laneletLayer) {
-    const auto lanelet_subtype = getLaneletSubtype(lanelet);
-    if (
-      lanelet_subtype == "road" || lanelet_subtype == "highway" ||
-      lanelet_subtype == "road_shoulder" || lanelet_subtype == "pedestrian_lane" ||
-      lanelet_subtype == "bicycle_lane" || lanelet_subtype == "walkway") {
-      if (
-        lanelet_subtype == "road" || lanelet_subtype == "highway" ||
-        lanelet_subtype == "road_shoulder") {
-        const auto & type_id = polyline_type_map_.getTypeID(lanelet_subtype);
-        auto points = getLanePointFromLineString(lanelet.centerline3d(), type_id);
-        insertLanePoints(points, all_points);
-      }
-      if (!isTurnIntersection(lanelet)) {
-        const auto & left = lanelet.leftBound3d();
-        const auto left_type = getLineStringType(left);
-        if (left_type == "line_thin" || left_type == "line_thick") {
-          const auto left_subtype = getLineStringSubtype(left);
-          const auto & type_id = polyline_type_map_.getTypeID(left_subtype);
-          if (type_id != -1) {
-            auto points = getLanePointFromLineString(left, type_id);
-            insertLanePoints(points, all_points);
-          }
-        }
-        const auto & right = lanelet.rightBound3d();
-        const auto right_type = getLineStringType(right);
-        if (right_type == "line_thin" || right_type == "line_thick") {
-          const auto right_subtype = getLineStringSubtype(right);
-          const auto & type_id = polyline_type_map_.getTypeID(right_subtype);
-          if (type_id != -1) {
-            auto points = getLanePointFromLineString(right, type_id);
-            insertLanePoints(points, all_points);
-          }
-        }
-      }
-    } else if (lanelet_subtype == "crosswalk") {
-      const auto & type_id = polyline_type_map_.getTypeID(lanelet_subtype);
-      auto points = getLanePointFromPolygon(lanelet.polygon3d(), type_id);
-      insertLanePoints(points, all_points);
-    }
-  }
-
-  for (const auto & linestring : lanelet_map_ptr_->lineStringLayer) {
-    const auto linestring_type = getLineStringType(linestring);
-    if (linestring_type != "road_boarder" && linestring_type != "traffic_sign") {
-      continue;
-    }
-    const auto & type_id = polyline_type_map_.getTypeID(linestring_type);
-    auto points = getLanePointFromLineString(linestring, type_id);
-    insertLanePoints(points, all_points);
-  }
-
-  if (all_points.size() == 0) {
-    return false;
-  }
-  polyline_ptr_ = std::make_shared<PolylineData>(
-    all_points, config_ptr_->max_num_polyline, config_ptr_->max_num_point,
-    config_ptr_->point_break_distance);
-  return true;
 }
 
 void MTRNode::removeAncientAgentHistory(
