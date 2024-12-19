@@ -417,21 +417,18 @@ PredictedObject MTRNode::createPredictedObject(
   predicted_object.classification = object.classification;
   predicted_object.shape = object.shape;
   predicted_object.object_id = object.object_id;
+  predicted_object.existence_probability = object.existence_probability;
 
-  float max_existence_probability = 0.0f;
   for (const auto & mode : trajectory.get_modes()) {
     PredictedPath waypoints;
     waypoints.confidence = mode.score();
     waypoints.time_step = rclcpp::Duration::from_seconds(0.1);  // TODO(ktro282): use a parameter
     waypoints.path.reserve(mode.num_future());
-    if (max_existence_probability < mode.score()) {
-      max_existence_probability = mode.score();
-    }
 
     for (const auto & state : mode.get_waypoints()) {
       geometry_msgs::msg::Pose predicted_pose;
-      predicted_pose.position.x = static_cast<double>(state.x());
-      predicted_pose.position.y = static_cast<double>(state.y());
+      predicted_pose.position.x = state.x();
+      predicted_pose.position.y = state.y();
       predicted_pose.position.z = init_pose_with_cov.pose.position.z;
       predicted_pose.orientation = init_pose_with_cov.pose.orientation;
       waypoints.path.emplace_back(predicted_pose);
@@ -441,7 +438,6 @@ PredictedObject MTRNode::createPredictedObject(
     }
     predicted_object.kinematics.predicted_paths.emplace_back(waypoints);
   }
-  predicted_object.existence_probability = max_existence_probability;
 
   return predicted_object;
 }
