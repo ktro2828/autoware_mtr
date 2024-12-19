@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -246,19 +247,19 @@ struct AgentData
    * @brief Construct a new instance.
    *
    * @param histories An array of histories for each object.
-   * @param sdc_index An index of ego.
+   * @param ego_index An index of ego.
    * @param target_indices Indices of target agents.
    * @param label_ids An array of label indices for each object.
    * @param timestamps An array of timestamps.
    */
   AgentData(
-    const std::vector<AgentHistory> & histories, const size_t sdc_index,
+    const std::vector<AgentHistory> & histories, const size_t ego_index,
     const std::vector<size_t> & target_indices, const std::vector<size_t> & label_ids,
     const std::vector<float> & timestamps)
   : num_target_(target_indices.size()),
     num_agent_(histories.size()),
     time_length_(timestamps.size()),
-    sdc_index_(sdc_index),
+    ego_index_(ego_index),
     target_indices_(target_indices),
     label_ids_(label_ids),
     timestamps_(timestamps)
@@ -280,7 +281,7 @@ struct AgentData
     }
 
     ego_data_.reserve(time_length_ * state_dim());
-    for (const auto & v : histories.at(sdc_index).as_array()) {
+    for (const auto & v : histories.at(ego_index).as_array()) {
       ego_data_.push_back(v);
     }
   }
@@ -301,7 +302,7 @@ struct AgentData
   static size_t state_dim() { return AgentStateDim; }
 
   // Return the index of ego.
-  int sdc_index() const { return sdc_index_; }
+  size_t ego_index() const { return ego_index_; }
 
   // Return the vector of indices of target agents, in shape `[B]`.
   const std::vector<size_t> & target_indices() const { return target_indices_; }
@@ -340,7 +341,7 @@ private:
   size_t num_target_;
   size_t num_agent_;
   size_t time_length_;
-  int sdc_index_;
+  size_t ego_index_;
   std::vector<size_t> target_indices_;
   std::vector<size_t> label_ids_;
   std::vector<size_t> target_label_ids_;

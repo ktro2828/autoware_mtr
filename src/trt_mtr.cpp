@@ -168,7 +168,7 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
 
   CHECK_CUDA_ERROR(agentPreprocessLauncher(
     num_target_, num_agent_, num_timestamp_, agent_data.state_dim(), agent_data.num_class(),
-    agent_data.sdc_index(), d_target_index_.get(), d_label_index_.get(), d_timestamp_.get(),
+    agent_data.ego_index(), d_target_index_.get(), d_label_index_.get(), d_timestamp_.get(),
     d_trajectory_.get(), d_in_trajectory_.get(), d_in_trajectory_mask_.get(), d_in_last_pos_.get(),
     stream_));
 
