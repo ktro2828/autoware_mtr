@@ -411,8 +411,8 @@ bool MTRNode::fetchData()
       static_cast<float>(twist.linear.y), ax, ay, true));
 
   constexpr size_t max_buffer_size = 100;
-  if (max_buffer_size < ego_states_.size()) {
-    ego_states_.erase(ego_states_.begin(), ego_states_.begin());
+  if (ego_states_.size() > max_buffer_size) {
+    ego_states_.erase(ego_states_.begin(), ego_states_.begin() + 1);
   }
   // make the ego vehicle a tracked object
   ego_tracked_object_ = makeEgoTrackedObject(ego_msg);
@@ -609,7 +609,7 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
     return item1.second < item2.second;
   });
 
-  constexpr size_t max_target_size = 2;  // TODO(ktro2828): use a parameter
+  constexpr size_t max_target_size = 1;  // TODO(ktro2828): use a parameter
   std::vector<size_t> target_indices;
   target_indices.reserve(max_target_size);
   for (const auto & [idx, _] : distances) {
