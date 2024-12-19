@@ -14,9 +14,13 @@
 
 #include "autoware/mtr/trt_mtr.hpp"
 
+#include "autoware/mtr/cuda_helper.hpp"
+#include "autoware/mtr/trajectory.hpp"
 #include "postprocess/postprocess_kernel.cuh"
 #include "preprocess/agent_preprocess_kernel.cuh"
 #include "preprocess/polyline_preprocess_kernel.cuh"
+
+#include <vector>
 
 namespace autoware::mtr
 {
@@ -194,24 +198,26 @@ bool TrtMTR::postProcess(
     num_target_, num_mode_, num_future_, agent_data.state_dim(), d_target_state_.get(),
     PredictedStateDim, d_out_trajectory_.get(), stream_));
 
+  CHECK_CUDA_ERROR(cudaStreamSynchronize(stream_));
+
   h_out_score_.clear();
   h_out_trajectory_.clear();
-  h_out_score_.reserve(num_target_ * num_mode_);
-  h_out_trajectory_.reserve(num_target_ * num_mode_ * num_future_ * PredictedStateDim);
+  h_out_score_.resize(num_target_ * num_mode_);
+  h_out_trajectory_.resize(num_target_ * num_mode_ * num_future_ * PredictedStateDim);
 
-  CHECK_CUDA_ERROR(cudaMemcpyAsync(
+  CHECK_CUDA_ERROR(cudaMemcpy(
     h_out_score_.data(), d_out_score_.get(), sizeof(float) * num_target_ * num_mode_,
-    cudaMemcpyDeviceToHost, stream_));
-  CHECK_CUDA_ERROR(cudaMemcpyAsync(
+    cudaMemcpyDeviceToHost));
+  CHECK_CUDA_ERROR(cudaMemcpy(
     h_out_trajectory_.data(), d_out_trajectory_.get(),
     sizeof(float) * num_target_ * num_mode_ * num_future_ * PredictedStateDim,
-    cudaMemcpyDeviceToHost, stream_));
+    cudaMemcpyDeviceToHost));
 
   trajectories.clear();
   trajectories.reserve(num_target_);
   for (auto b = 0; b < num_target_; ++b) {
     const auto score_itr = h_out_score_.cbegin() + b * num_mode_;
-    std::vector<double> scores(score_itr, score_itr + num_mode_);
+    const std::vector<double> scores(score_itr, score_itr + num_mode_);
     const auto mode_itr =
       h_out_trajectory_.cbegin() + b * num_mode_ * num_future_ * PredictedStateDim;
     std::vector<double> modes(mode_itr, mode_itr + num_mode_ * num_future_ * PredictedStateDim);
