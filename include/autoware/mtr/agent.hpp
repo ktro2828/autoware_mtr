@@ -132,15 +132,16 @@ struct AgentHistory
    *
    * @param state Object current state.
    * @param object_id Object ID.
+   * @param label_id Label ID.
    * @param current_time Current timestamp.
    * @param max_time_length History length.
    */
   AgentHistory(
-    const AgentState & state, const std::string & object_id, const size_t label_index,
+    const AgentState & state, const std::string & object_id, const size_t label_id,
     const double current_time, const size_t max_time_length)
   : queue_(max_time_length),
     object_id_(object_id),
-    label_index_(label_index),
+    label_id_(label_id),
     latest_time_(current_time),
     max_time_length_(max_time_length)
   {
@@ -162,7 +163,8 @@ struct AgentHistory
   // Return the object id.
   const std::string & object_id() const { return object_id_; }
 
-  size_t label_index() const { return label_index_; }
+  // Return the label id.
+  size_t label_id() const { return label_id_; }
 
   /**
    * @brief Return the last timestamp when non-empty state was pushed.
@@ -230,7 +232,7 @@ struct AgentHistory
 private:
   FixedQueue<AgentState> queue_;
   const std::string object_id_;
-  const size_t label_index_;
+  const size_t label_id_;
   double latest_time_;
   const size_t max_time_length_;
 };
@@ -246,19 +248,19 @@ struct AgentData
    * @param histories An array of histories for each object.
    * @param sdc_index An index of ego.
    * @param target_index Indices of target agents.
-   * @param label_index An array of label indices for each object.
+   * @param label_ids An array of label indices for each object.
    * @param timestamps An array of timestamps.
    */
   AgentData(
     const std::vector<AgentHistory> & histories, const size_t sdc_index,
-    const std::vector<size_t> & target_index, const std::vector<size_t> & label_index,
+    const std::vector<size_t> & target_index, const std::vector<size_t> & label_ids,
     const std::vector<float> & timestamps)
   : num_target_(target_index.size()),
     num_agent_(histories.size()),
     time_length_(timestamps.size()),
     sdc_index_(sdc_index),
     target_index_(target_index),
-    label_index_(label_index),
+    label_ids_(label_ids),
     timestamps_(timestamps)
   {
     data_.reserve(num_agent_ * time_length_ * state_dim());
@@ -269,9 +271,9 @@ struct AgentData
     }
 
     target_data_.reserve(num_target_ * state_dim());
-    target_label_index_.reserve(num_target_);
+    target_label_ids_.reserve(num_target_);
     for (const auto & idx : target_index) {
-      target_label_index_.emplace_back(label_index.at(idx));
+      target_label_ids_.emplace_back(label_ids.at(idx));
       for (const auto & v : histories.at(idx).as_array()) {
         target_data_.push_back(v);
       }
@@ -304,11 +306,11 @@ struct AgentData
   // Return the vector of indices of target agents, in shape `[B]`.
   const std::vector<size_t> & target_index() const { return target_index_; }
 
-  // Return the vector of label indices of all agents, in shape `[N]`.
-  const std::vector<size_t> & label_index() const { return label_index_; }
+  // Return the vector of label ids of all agents, in shape `[N]`.
+  const std::vector<size_t> & label_ids() const { return label_ids_; }
 
-  // Return the vector of label indices of target agents, in shape `[B]`.
-  const std::vector<size_t> & target_label_index() const { return target_label_index_; }
+  // Return the vector of label ids of target agents, in shape `[B]`.
+  const std::vector<size_t> & target_label_ids() const { return target_label_ids_; }
 
   // Return the vector of timestamps in shape `[T]`.
   const std::vector<float> & timestamps() const { return timestamps_; }
@@ -340,8 +342,8 @@ private:
   size_t time_length_;
   int sdc_index_;
   std::vector<size_t> target_index_;
-  std::vector<size_t> label_index_;
-  std::vector<size_t> target_label_index_;
+  std::vector<size_t> label_ids_;
+  std::vector<size_t> target_label_ids_;
   std::vector<float> timestamps_;
   std::vector<float> data_;
   std::vector<float> target_data_;

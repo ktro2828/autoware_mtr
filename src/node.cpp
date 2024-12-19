@@ -158,15 +158,15 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
 
   std::vector<std::string> object_ids;
   std::vector<AgentHistory> histories;
-  std::vector<size_t> label_indices;
+  std::vector<size_t> label_ids;
   histories.reserve(agent_history_map_.size());
   object_ids.reserve(agent_history_map_.size());
-  label_indices.reserve(agent_history_map_.size());
+  label_ids.reserve(agent_history_map_.size());
   int sdc_index = -1;
   for (const auto & [object_id, history] : agent_history_map_) {
     object_ids.emplace_back(object_id);
     histories.emplace_back(history);
-    label_indices.emplace_back(history.label_index());
+    label_ids.emplace_back(history.label_id());
     if (object_id == EGO_ID) {
       sdc_index = histories.size() - 1;
     }
@@ -185,7 +185,7 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
 
   const auto relative_timestamps = getRelativeTimestamps();
   AgentData agent_data(
-    histories, static_cast<size_t>(sdc_index), target_indices, label_indices, relative_timestamps);
+    histories, static_cast<size_t>(sdc_index), target_indices, label_ids, relative_timestamps);
 
   std::vector<PredictedTrajectory> trajectories;
   if (!model_ptr_->doInference(agent_data, *polyline_data, trajectories)) {

@@ -144,7 +144,7 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     d_target_index_.get(), agent_data.target_index().data(), sizeof(int) * num_target_,
     cudaMemcpyHostToDevice, stream_));
   CHECK_CUDA_ERROR(cudaMemcpyAsync(
-    d_label_index_.get(), agent_data.label_index().data(), sizeof(int) * num_agent_,
+    d_label_index_.get(), agent_data.label_ids().data(), sizeof(int) * num_agent_,
     cudaMemcpyHostToDevice, stream_));
   CHECK_CUDA_ERROR(cudaMemcpyAsync(
     d_timestamp_.get(), agent_data.timestamps().data(), sizeof(float) * num_timestamp_,
@@ -160,7 +160,7 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     d_polyline_.get(), polyline_data.data_ptr(), sizeof(float) * polyline_data.size(),
     cudaMemcpyHostToDevice, stream_));
 
-  const auto target_label_names = getLabelNames(agent_data.target_label_index());
+  const auto target_label_names = getLabelNames(agent_data.target_label_ids());
   const auto intention_point = intention_point_.get_points(target_label_names);
   CHECK_CUDA_ERROR(cudaMemcpyAsync(
     d_intention_point_.get(), intention_point.data(),
