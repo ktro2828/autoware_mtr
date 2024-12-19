@@ -141,10 +141,10 @@ void TrtMTR::initCudaPtr(const AgentData & agent_data, const PolylineData & poly
 bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyline_data)
 {
   CHECK_CUDA_ERROR(cudaMemcpyAsync(
-    d_target_index_.get(), agent_data.target_index().data(), sizeof(int) * num_target_,
+    d_target_index_.get(), agent_data.target_indices().data(), sizeof(int) * num_target_,
     cudaMemcpyHostToDevice, stream_));
   CHECK_CUDA_ERROR(cudaMemcpyAsync(
-    d_label_index_.get(), agent_data.label_index().data(), sizeof(int) * num_agent_,
+    d_label_index_.get(), agent_data.label_ids().data(), sizeof(int) * num_agent_,
     cudaMemcpyHostToDevice, stream_));
   CHECK_CUDA_ERROR(cudaMemcpyAsync(
     d_timestamp_.get(), agent_data.timestamps().data(), sizeof(float) * num_timestamp_,
@@ -160,7 +160,7 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     d_polyline_.get(), polyline_data.data_ptr(), sizeof(float) * polyline_data.size(),
     cudaMemcpyHostToDevice, stream_));
 
-  const auto target_label_names = getLabelNames(agent_data.target_label_index());
+  const auto target_label_names = getLabelNames(agent_data.target_label_ids());
   const auto intention_point = intention_point_.get_points(target_label_names);
   CHECK_CUDA_ERROR(cudaMemcpyAsync(
     d_intention_point_.get(), intention_point.data(),
@@ -168,7 +168,7 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
 
   CHECK_CUDA_ERROR(agentPreprocessLauncher(
     num_target_, num_agent_, num_timestamp_, agent_data.state_dim(), agent_data.num_class(),
-    agent_data.sdc_index(), d_target_index_.get(), d_label_index_.get(), d_timestamp_.get(),
+    agent_data.ego_index(), d_target_index_.get(), d_label_index_.get(), d_timestamp_.get(),
     d_trajectory_.get(), d_in_trajectory_.get(), d_in_trajectory_mask_.get(), d_in_last_pos_.get(),
     stream_));
 
