@@ -56,6 +56,7 @@ ament_auto_add_library(${PROJECT_NAME}_lib SHARED
   src/builder.cpp
   src/trt_mtr.cpp
   src/conversions/lanelet.cpp
+  src/intention_point.cpp
 )
 target_link_libraries(${PROJECT_NAME}_lib
   ${TRT_PLUGINS}
