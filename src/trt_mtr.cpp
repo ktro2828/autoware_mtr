@@ -15,6 +15,7 @@
 #include "autoware/mtr/trt_mtr.hpp"
 
 #include "autoware/mtr/cuda_helper.hpp"
+#include "autoware/mtr/intention_point.hpp"
 #include "autoware/mtr/trajectory.hpp"
 #include "postprocess/postprocess_kernel.cuh"
 #include "preprocess/agent_preprocess_kernel.cuh"
@@ -28,7 +29,8 @@ TrtMTR::TrtMTR(
   const std::string & model_path, const MTRConfig & config, const BuildConfig & build_config,
   const size_t max_workspace_size)
 : config_(config),
-  intention_point_(config_.intention_point_filepath, config_.num_intention_point_cluster)
+  intention_point_(IntentionPoint::from_file(
+    config_.intention_point_filepath, config_.num_intention_point_cluster))
 {
   max_num_polyline_ = config_.max_num_polyline;
   num_mode_ = config_.num_mode;
@@ -165,7 +167,7 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     cudaMemcpyHostToDevice, stream_));
 
   const auto target_label_names = getLabelNames(agent_data.target_label_ids());
-  const auto intention_point = intention_point_.get_points(target_label_names);
+  const auto intention_point = intention_point_.as_array(target_label_names);
   CHECK_CUDA_ERROR(cudaMemcpyAsync(
     d_intention_point_.get(), intention_point.data(),
     sizeof(float) * num_target_ * intention_point_.size(), cudaMemcpyHostToDevice, stream_));

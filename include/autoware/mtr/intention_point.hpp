@@ -26,9 +26,6 @@
 
 namespace autoware::mtr
 {
-
-constexpr size_t IntentionPointDim = 2;
-
 /**
  * @brief A class to load and store intention points.
  */
@@ -36,27 +33,12 @@ struct IntentionPoint
 {
 public:
   /**
-   * @brief Construct a new Intention.
-   *
-   * @param data_map Map of intention points hashed by label names.
-   * @param num_cluster The number of clusters.
-   */
-  IntentionPoint(
-    const std::unordered_map<std::string, std::vector<float>> data_map, const size_t num_cluster)
-  : data_map_(data_map), num_cluster_(num_cluster)
-  {
-  }
-
-  static size_t state_dim() { return IntentionPointDim; }
-
-  /**
-   * @brief Construct a new Intention from csv file.
+   * @brief Construct a new instance from a csv file.
    *
    * @param csv_filepath Path to csv file.
    * @param num_cluster The number of clusters.
    */
-  IntentionPoint(const std::string csv_filepath, const size_t num_cluster)
-  : num_cluster_(num_cluster)
+  static IntentionPoint from_file(const std::string csv_filepath, const size_t num_cluster)
   {
     std::ifstream file(csv_filepath);
     if (!file.is_open()) {
@@ -82,11 +64,17 @@ public:
     }
     file.close();
 
+    std::unordered_map<std::string, std::vector<float>> data_map;
     for (const auto & [x, y, label] : buffer) {
-      data_map_[label].emplace_back(x);
-      data_map_[label].emplace_back(y);
+      data_map[label].emplace_back(x);
+      data_map[label].emplace_back(y);
     }
+
+    return {data_map, num_cluster};
   }
+
+  // Returns the point state dimension, which is 2 (x, y).
+  static size_t state_dim() { return 2; }
 
   /**
    * @brief Load intention points for specified label names.
@@ -94,7 +82,7 @@ public:
    * @param label_names Array of label names for all agents, in shape [N].
    * @return std::vector<float> Array of all points in shape, [N * num_cluster * 2].
    */
-  std::vector<float> get_points(const std::vector<std::string> & label_names)
+  std::vector<float> as_array(const std::vector<std::string> & label_names)
   {
     std::vector<float> points;
     points.reserve(label_names.size() * num_cluster_ * state_dim());
@@ -108,12 +96,24 @@ public:
   }
 
   // Return the size of intension point `K*D`.
-  size_t size() const { return num_cluster_ * state_dim(); }
+  size_t size() const noexcept { return num_cluster_ * state_dim(); }
 
   // Return the number of clusters contained in intention points `K`.
-  size_t num_cluster() const { return num_cluster_; }
+  size_t num_cluster() const noexcept { return num_cluster_; }
 
 private:
+  /**
+   * @brief Construct a new Intention.
+   *
+   * @param data_map Map of intention points hashed by label names.
+   * @param num_cluster The number of clusters.
+   */
+  IntentionPoint(
+    const std::unordered_map<std::string, std::vector<float>> data_map, const size_t num_cluster)
+  : data_map_(data_map), num_cluster_(num_cluster)
+  {
+  }
+
   std::unordered_map<std::string, std::vector<float>> data_map_;
   size_t num_cluster_;
 };
