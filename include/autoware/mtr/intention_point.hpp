@@ -38,7 +38,7 @@ public:
    * @param csv_filepath Path to csv file.
    * @param num_cluster The number of clusters.
    */
-  static IntentionPoint from_file(const std::string csv_filepath, const size_t num_cluster)
+  static IntentionPoint from_file(size_t num_cluster, const std::string csv_filepath)
   {
     std::ifstream file(csv_filepath);
     if (!file.is_open()) {
@@ -70,7 +70,7 @@ public:
       data_map[label].emplace_back(y);
     }
 
-    return {data_map, num_cluster};
+    return {num_cluster, data_map};
   }
 
   // Returns the point state dimension, which is 2 (x, y).
@@ -87,8 +87,7 @@ public:
   // Return the size of intension point `K*D`.
   size_t size() const noexcept;
 
-  // Return the number of clusters contained in intention points `K`.
-  size_t num_cluster() const noexcept;
+  size_t num_cluster;  //!< The number of point clusters, which is K.
 
 private:
   /**
@@ -98,13 +97,12 @@ private:
    * @param num_cluster The number of clusters.
    */
   IntentionPoint(
-    const std::unordered_map<std::string, std::vector<float>> data_map, size_t num_cluster)
-  : data_map_(data_map), num_cluster_(num_cluster)
+    size_t num_cluster, const std::unordered_map<std::string, std::vector<float>> data_map)
+  : num_cluster(num_cluster), data_map_(data_map)
   {
   }
 
   std::unordered_map<std::string, std::vector<float>> data_map_;  //!< Map of label name and points.
-  size_t num_cluster_;                                            //!< The number of point clusters.
 };
 }  // namespace autoware::mtr
 #endif  // AUTOWARE__MTR__INTENTION_POINT_HPP_

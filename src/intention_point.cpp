@@ -24,7 +24,7 @@ namespace autoware::mtr
 std::vector<float> IntentionPoint::as_array(const std::vector<std::string> & label_names) const
 {
   std::vector<float> points;
-  points.reserve(label_names.size() * num_cluster_ * state_dim());
+  points.reserve(label_names.size() * num_cluster * state_dim());
   for (const auto & name : label_names) {
     const auto & label_points = data_map_.at(name);
     for (const auto & p : label_points) {
@@ -36,11 +36,6 @@ std::vector<float> IntentionPoint::as_array(const std::vector<std::string> & lab
 
 size_t IntentionPoint::size() const noexcept
 {
-  return num_cluster_ * state_dim();
-}
-
-size_t IntentionPoint::num_cluster() const noexcept
-{
-  return num_cluster_;
+  return num_cluster * state_dim();
 }
 }  // namespace autoware::mtr

@@ -30,7 +30,7 @@ TrtMTR::TrtMTR(
   const size_t max_workspace_size)
 : config_(config),
   intention_point_(IntentionPoint::from_file(
-    config_.intention_point_filepath, config_.num_intention_point_cluster))
+    config_.num_intention_point_cluster, config_.intention_point_filepath))
 {
   max_num_polyline_ = config_.max_num_polyline;
   num_mode_ = config_.num_mode;
