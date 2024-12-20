@@ -295,12 +295,12 @@ struct AgentData
       }
     }
 
-    target_data_.reserve(num_target_ * state_dim());
+    current_target_data_.reserve(num_target_ * state_dim());  // (B, D)
     target_label_ids_.reserve(num_target_);
     for (const auto & idx : target_indices) {
       target_label_ids_.emplace_back(label_ids.at(idx));
-      for (const auto & v : histories.at(idx).as_array()) {
-        target_data_.push_back(v);
+      for (const auto & v : histories.at(idx).get_latest_state().as_array()) {
+        current_target_data_.push_back(v);
       }
     }
 
@@ -356,7 +356,7 @@ struct AgentData
   const float * data_ptr() const noexcept { return data_.data(); }
 
   // Return the address pointer of data array for target agents.
-  const float * target_data_ptr() const noexcept { return target_data_.data(); }
+  const float * current_target_data_ptr() const noexcept { return current_target_data_.data(); }
 
   // Return the address pointer of data array for ego vehicle.
   const float * ego_data_ptr() const noexcept { return ego_data_.data(); }
@@ -371,7 +371,7 @@ private:
   std::vector<size_t> target_label_ids_;
   std::vector<float> timestamps_;
   std::vector<float> data_;
-  std::vector<float> target_data_;
+  std::vector<float> current_target_data_;
   std::vector<float> ego_data_;
 };
 
