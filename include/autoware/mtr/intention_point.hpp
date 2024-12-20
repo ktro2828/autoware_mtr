@@ -74,7 +74,7 @@ public:
   }
 
   // Returns the point state dimension, which is 2 (x, y).
-  static size_t state_dim() { return 2; }
+  static size_t state_dim() noexcept { return 2; }
 
   /**
    * @brief Load intention points for specified label names.
@@ -82,24 +82,13 @@ public:
    * @param label_names Array of label names for all agents, in shape [N].
    * @return std::vector<float> Array of all points in shape, [N * num_cluster * 2].
    */
-  std::vector<float> as_array(const std::vector<std::string> & label_names)
-  {
-    std::vector<float> points;
-    points.reserve(label_names.size() * num_cluster_ * state_dim());
-    for (const auto & name : label_names) {
-      const auto & label_points = data_map_.at(name);
-      for (const auto & p : label_points) {
-        points.emplace_back(p);
-      }
-    }
-    return points;
-  }
+  std::vector<float> as_array(const std::vector<std::string> & label_names) const;
 
   // Return the size of intension point `K*D`.
-  size_t size() const noexcept { return num_cluster_ * state_dim(); }
+  size_t size() const noexcept;
 
   // Return the number of clusters contained in intention points `K`.
-  size_t num_cluster() const noexcept { return num_cluster_; }
+  size_t num_cluster() const noexcept;
 
 private:
   /**
@@ -109,13 +98,13 @@ private:
    * @param num_cluster The number of clusters.
    */
   IntentionPoint(
-    const std::unordered_map<std::string, std::vector<float>> data_map, const size_t num_cluster)
+    const std::unordered_map<std::string, std::vector<float>> data_map, size_t num_cluster)
   : data_map_(data_map), num_cluster_(num_cluster)
   {
   }
 
-  std::unordered_map<std::string, std::vector<float>> data_map_;
-  size_t num_cluster_;
+  std::unordered_map<std::string, std::vector<float>> data_map_;  //!< Map of label name and points.
+  size_t num_cluster_;                                            //!< The number of point clusters.
 };
 }  // namespace autoware::mtr
 #endif  // AUTOWARE__MTR__INTENTION_POINT_HPP_
