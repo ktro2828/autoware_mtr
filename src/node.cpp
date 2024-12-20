@@ -15,6 +15,7 @@
 #include "autoware/mtr/node.hpp"
 
 #include "autoware/mtr/agent.hpp"
+#include "autoware/mtr/conversions/history.hpp"
 #include "autoware/mtr/conversions/lanelet.hpp"
 #include "autoware/mtr/fixed_queue.hpp"
 
@@ -185,6 +186,8 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
 
   const auto ego_index = static_cast<size_t>(tmp_ego_index);
   const auto relative_timestamps = getRelativeTimestamps();
+  // For testing purposes, normally pre-processing is done in the cuda side.
+  // const auto agent_centric_histories = getAgentCentricHistories(histories);
   AgentData agent_data(histories, ego_index, target_indices, label_ids, relative_timestamps);
 
   std::vector<PredictedTrajectory> trajectories;
