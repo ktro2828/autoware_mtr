@@ -18,6 +18,7 @@
 #include "autoware/mtr/conversions/history.hpp"
 #include "autoware/mtr/conversions/lanelet.hpp"
 #include "autoware/mtr/fixed_queue.hpp"
+#include "autoware/mtr/utils.hpp"
 
 #include <lanelet2_extension/utility/message_conversion.hpp>
 #include <rclcpp/logging.hpp>
@@ -192,7 +193,7 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
   // For testing purposes, normally pre-processing is done in the cuda side.
   // const auto agent_centric_histories = getAgentCentricHistories(histories);
   AgentData agent_data(histories, ego_index, target_indices, label_ids, relative_timestamps);
-
+  autoware::mtr::utils::print_agent_data(agent_data);
   std::vector<PredictedTrajectory> trajectories;
   if (!model_ptr_->doInference(agent_data, *polyline_data, trajectories)) {
     RCLCPP_WARN(get_logger(), "Inference failed");
@@ -260,11 +261,17 @@ std::optional<TrackedObject> MTRNode::getLatestEgo()
 
   // Shape
   {
-    const auto & ego_max_long_offset = vehicle_info_.max_longitudinal_offset_m;
-    const auto & ego_rear_overhang = vehicle_info_.vehicle_height_m;
-    const auto & ego_length = vehicle_info_.vehicle_length_m;
-    const auto & ego_width = vehicle_info_.vehicle_width_m;
-    const auto & ego_height = vehicle_info_.vehicle_height_m;
+    // const auto & ego_max_long_offset = vehicle_info_.max_longitudinal_offset_m;
+    // const auto & ego_rear_overhang = vehicle_info_.vehicle_height_m;
+    // const auto & ego_length = vehicle_info_.vehicle_length_m;
+    // const auto & ego_width = vehicle_info_.vehicle_width_m;
+    // const auto & ego_height = vehicle_info_.vehicle_height_m;
+
+    const auto ego_max_long_offset = 2.9;
+    const auto ego_rear_overhang = 1.1;
+    const auto ego_length = 4.0;
+    const auto ego_width = 2.0;
+    const auto ego_height = 2.0;
 
     autoware_perception_msgs::msg::Shape shape;
     shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
