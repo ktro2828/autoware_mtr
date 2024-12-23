@@ -17,6 +17,7 @@
 
 #include <cstddef>
 #include <deque>
+#include <iterator>
 
 namespace autoware::mtr
 {
@@ -27,7 +28,9 @@ class FixedQueue
 public:
   using size_type = typename std::deque<T>::size_type;
   using iterator = typename std::deque<T>::iterator;
+  using riterator = typename std::reverse_iterator<iterator>;
   using const_iterator = typename std::deque<T>::const_iterator;
+  using rconst_iterator = typename std::reverse_iterator<const_iterator>;
 
   explicit FixedQueue(size_t size) { queue_.resize(size); }
 
@@ -60,6 +63,12 @@ public:
 
   iterator end() noexcept { return queue_.end(); }
   const_iterator end() const noexcept { return queue_.end(); }
+
+  riterator rbegin() noexcept { return queue_.rbegin(); }
+  rconst_iterator rbegin() const noexcept { return queue_.rbegin(); }
+
+  riterator rend() noexcept { return queue_.rend(); }
+  rconst_iterator rend() const noexcept { return queue_.rend(); }
 
   size_type size() const noexcept { return queue_.size(); }
 

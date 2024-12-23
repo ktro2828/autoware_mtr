@@ -24,16 +24,31 @@
 #include <array>
 #include <cstddef>
 #include <limits>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
-
 namespace autoware::mtr
 {
 constexpr size_t AgentStateDim = 12;
 
 enum AgentLabel { VEHICLE = 0, PEDESTRIAN = 1, CYCLIST = 2 };
+
+enum AgentDimLabels {
+  X = 0,
+  Y = 1,
+  Z = 2,
+  L = 3,
+  W = 4,
+  H = 5,
+  YAW = 6,
+  VX = 7,
+  VY = 8,
+  AX = 9,
+  AY = 10,
+  VALIDITY = 11
+};
 
 /**
  * @brief A class to represent a single state of an agent.
@@ -230,6 +245,15 @@ struct AgentHistory
   // Get the latest agent state at `T`.
   const AgentState & get_latest_state() const { return *queue_.end(); }
 
+  // Get the latest agent state at `T`.
+  std::optional<AgentState> get_latest_valid_state() const
+  {
+    auto latest_valid_state = std::find_if(
+      queue_.rbegin(), queue_.rend(), [](const auto & state) { return state.is_valid(); });
+    return (latest_valid_state != queue_.rend()) ? std::make_optional(*latest_valid_state)
+                                                 : std::nullopt;
+  }
+
 private:
   FixedQueue<AgentState> queue_;
   const std::string object_id_;
@@ -352,7 +376,7 @@ private:
 };
 
 // Get label names from label indices.
-std::vector<std::string> getLabelNames(const std::vector<size_t> & label_index)
+inline std::vector<std::string> getLabelNames(const std::vector<size_t> & label_index)
 {
   std::vector<std::string> label_names;
   label_names.reserve(label_index.size());
