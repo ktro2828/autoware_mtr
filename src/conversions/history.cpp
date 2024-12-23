@@ -25,7 +25,7 @@ using adl = autoware::mtr::AgentDimLabels;
  * @param reference_state reference state used as reference frame.
  * @return  vector of histories, each in the reference frame of the last state.
  */
-[[nodiscard]] inline std::pair<float, float> transform2D(
+[[nodiscard]] std::pair<float, float> transform2D(
   const std::pair<float, float> input_xy, const std::pair<float, float> reference_xy,
   const std::pair<float, float> rotation_cos_sin)
 {
@@ -44,7 +44,7 @@ using adl = autoware::mtr::AgentDimLabels;
  * @param reference_state reference state used as reference frame.
  * @return  vector of histories, each in the reference frame of the last state.
  */
-[[nodiscard]] inline AgentHistory getAgentCentricHistory(
+[[nodiscard]] AgentHistory getAgentCentricHistory(
   const AgentHistory & history, const AgentState & reference_state)
 {
   const auto latest_valid_state = history.get_latest_valid_state();
@@ -92,7 +92,7 @@ using adl = autoware::mtr::AgentDimLabels;
  * @param histories vector of histories to modify.
  * @return  vector of histories, each in the reference frame of the last state.
  */
-[[nodiscard]] inline std::vector<AgentHistory> getAgentCentricHistories(
+[[nodiscard]] std::vector<AgentHistory> getAgentCentricHistories(
   const std::vector<AgentHistory> & histories)
 {
   std::vector<AgentHistory> agent_centric_histories;
