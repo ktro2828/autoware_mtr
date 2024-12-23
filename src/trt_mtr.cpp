@@ -21,6 +21,7 @@
 #include "preprocess/agent_preprocess_kernel.cuh"
 #include "preprocess/polyline_preprocess_kernel.cuh"
 
+#include <iostream>
 #include <vector>
 
 namespace autoware::mtr
@@ -220,6 +221,35 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     d_trajectory_.get(), d_in_trajectory_.get(), d_in_trajectory_mask_.get(), d_in_last_pos_.get(),
     stream_));
 
+  auto T = 11;
+  // auto D = 12;
+  // auto C = 3;
+
+  auto B = 2;
+  auto N = 2;
+
+  std::vector<float> host_buffer(N * B * T * 29);
+
+  // Step 2: Copy data from GPU to host
+  cudaMemcpy(
+    host_buffer.data(), d_in_trajectory_.get(), N * B * T * 29 * sizeof(float),
+    cudaMemcpyDeviceToHost);
+
+  std::cerr << "Preprocessed output \n";
+  std::vector<std::string> values{"x",  "y",   "z",   "L",    "W",    "H",  "O0", "O1", "O2", "O3",
+                                  "O4", "T0",  "T1",  "T2",   "T3",   "T4", "T5", "T6", "T7", "T8",
+                                  "T9", "T10", "T11", "Yaw0", "Yaw1", "Vx", "Vy", "Ax", "Ay"};
+  for (int b = 0; b < B; b++) {
+    for (int n = 0; n < N; n++) {
+      std::cerr << "{b: " << b;
+      std::cerr << ",n: " << b << ": ";
+      for (int i = 0; i < 29; ++i) {
+        std::cerr << values[i] << ": " << host_buffer[b * N * T * 29 + (n * T + T - 1) * 29 + i]
+                  << ",";
+      }
+      std::cerr << "}\n";
+    }
+  }
   if (max_num_polyline_ < num_polyline_) {
     CHECK_CUDA_ERROR(polylinePreprocessWithTopkLauncher(
       max_num_polyline_, num_polyline_, num_point_, polyline_data.state_dim(), d_polyline_.get(),
