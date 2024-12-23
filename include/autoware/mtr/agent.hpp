@@ -280,7 +280,7 @@ struct AgentData
     const std::vector<AgentHistory> & histories, const size_t ego_index,
     const std::vector<size_t> & target_indices, const std::vector<size_t> & label_ids,
     const std::vector<float> & timestamps)
-  : num_target_(target_indices.size()),
+  : num_target_(target_indices.size() + 1),  // NPC targets + Ego
     num_agent_(histories.size()),
     time_length_(timestamps.size()),
     ego_index_(ego_index),
