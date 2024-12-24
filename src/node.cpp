@@ -386,6 +386,8 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
       tf2::doTransform(pose_in_map, pose_in_ego, *map2ego);
 
       const auto distance = std::hypot(pose_in_ego.pose.position.x, pose_in_ego.pose.position.y);
+      std::cerr << "object id and distance " << history.object_id() << " distaNce " << distance
+                << std::endl;
       index_distances.emplace_back(idx, distance);
     }
   }
