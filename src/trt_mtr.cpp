@@ -242,7 +242,7 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
   for (int b = 0; b < B; b++) {
     for (int n = 0; n < N; n++) {
       std::cerr << "{b: " << b;
-      std::cerr << ",n: " << b << ": ";
+      std::cerr << ",n: " << n << ": ";
       for (int i = 0; i < 29; ++i) {
         std::cerr << values[i] << ": " << host_buffer[b * N * T * 29 + (n * T + T - 1) * 29 + i]
                   << ",";
