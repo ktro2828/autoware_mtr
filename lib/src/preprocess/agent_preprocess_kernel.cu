@@ -33,7 +33,7 @@ __global__ void agentPreprocessKernel(
 
   // === out data ===
   // --- transform trajectory to target centric coords ---
-  const int src_trajectory_idx = (b * T + t) * D;
+  const int src_trajectory_idx = (n * T + t) * D;
   const float x = in_trajectory[src_trajectory_idx];
   const float y = in_trajectory[src_trajectory_idx + 1];
   const float z = in_trajectory[src_trajectory_idx + 2];
