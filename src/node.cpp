@@ -400,8 +400,8 @@ std::vector<float> MTRNode::getRelativeTimestamps() const
 {
   std::vector<float> output;
   output.reserve(timestamps_->size());
-  for (auto & t : *timestamps_) {
-    output.push_back(t - *timestamps_->begin());
+  for (const auto & t : *timestamps_) {
+    output.push_back(t - timestamps_->front());
   }
   return output;
 }

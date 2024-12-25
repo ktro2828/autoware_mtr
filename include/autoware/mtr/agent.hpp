@@ -243,7 +243,7 @@ struct AgentHistory
   bool is_valid_latest() const { return get_latest_state().is_valid(); }
 
   // Get the latest agent state at `T`.
-  const AgentState & get_latest_state() const { return *queue_.end(); }
+  const AgentState & get_latest_state() const { return queue_.back(); }
 
   // Get the latest agent state at `T`.
   std::optional<AgentState> get_latest_valid_state() const
