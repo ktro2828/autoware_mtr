@@ -41,7 +41,7 @@ namespace autoware::mtr
 {
 // TODO(ktro2828): use a parameter
 constexpr double TIME_THRESHOLD = 1.0;
-constexpr size_t MAX_NUM_TARGET = 2;
+constexpr size_t NUM_TARGET = 2;
 constexpr double POLYLINE_DISTANCE_THRESHOLD = 100.0;
 namespace
 {
@@ -179,8 +179,15 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
   }
 
   const auto target_indices = extractTargetAgent(histories);
+<<<<<<< Updated upstream
   if (target_indices.empty()) {
     RCLCPP_WARN(get_logger(), "No target agents");
+=======
+  if (target_indices.size() != NUM_TARGET) {
+    RCLCPP_WARN(
+      get_logger(), "Found target size mismatch, %zu targets were extracted, but %zu were expected",
+      target_indices.size(), NUM_TARGET);
+>>>>>>> Stashed changes
     return;
   }
 
@@ -388,7 +395,7 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
   std::vector<size_t> target_indices;
   for (const auto & [idx, _] : index_distances) {
     target_indices.emplace_back(idx);
-    if (MAX_NUM_TARGET <= target_indices.size()) {
+    if (NUM_TARGET <= target_indices.size()) {
       break;
     }
   }
