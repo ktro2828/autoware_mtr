@@ -364,7 +364,7 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
   std::vector<std::pair<size_t, double>> index_distances;
   for (size_t idx = 0; idx < histories.size(); ++idx) {
     const auto & history = histories.at(idx);
-    if (history.is_valid_latest() && history.object_id() != EGO_ID) {
+    if (history.is_valid_latest()) {
       const auto & state = history.get_latest_state();
       geometry_msgs::msg::PoseStamped pose_in_map;
       pose_in_map.pose.position.x = state.x();
