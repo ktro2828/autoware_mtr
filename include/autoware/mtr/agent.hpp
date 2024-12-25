@@ -155,11 +155,11 @@ struct AgentHistory
   AgentHistory(
     const AgentState & state, const std::string & object_id, const size_t label_id,
     const double current_time, const size_t max_time_length)
-  : queue_(max_time_length),
-    object_id_(object_id),
+  : object_id_(object_id),
     label_id_(label_id),
     latest_time_(current_time),
-    max_time_length_(max_time_length)
+    max_time_length_(max_time_length),
+    queue_(FixedQueue<AgentState>(max_time_length))
   {
     queue_.push_back(state);
   }
@@ -263,11 +263,11 @@ struct AgentHistory
   }
 
 private:
-  FixedQueue<AgentState> queue_;
   const std::string object_id_;
   const size_t label_id_;
   double latest_time_;
   const size_t max_time_length_;
+  FixedQueue<AgentState> queue_;
 };
 
 /**
