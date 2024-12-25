@@ -158,9 +158,9 @@ struct AgentHistory
   : object_id_(object_id),
     label_id_(label_id),
     latest_time_(current_time),
-    max_time_length_(max_time_length),
-    queue_(FixedQueue<AgentState>(max_time_length))
+    max_time_length_(max_time_length)
   {
+    queue_.set_size(max_time_length);
     queue_.push_back(state);
   }
 

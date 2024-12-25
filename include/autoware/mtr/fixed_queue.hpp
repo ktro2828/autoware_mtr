@@ -36,6 +36,8 @@ public:
 
   explicit FixedQueue(size_t size) : size_(size) { queue_.resize(size); }
 
+  explicit FixedQueue() = default;
+
   ~FixedQueue() = default;
 
   FixedQueue(const FixedQueue & other) { queue_ = other.queue_; }
@@ -97,6 +99,12 @@ public:
   rconst_iterator rend() const noexcept { return queue_.rend(); }
 
   size_type size() const noexcept { return queue_.size(); }
+
+  void set_size(size_t size)
+  {
+    size_ = size;
+    queue_.resize(size);
+  }
 
 private:
   std::deque<T> queue_;
