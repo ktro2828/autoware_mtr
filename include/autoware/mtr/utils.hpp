@@ -41,7 +41,7 @@ namespace autoware::mtr::utils
 inline void print_data(
   const float * data, const std::string & obj_name, const size_t num_timestamps = 1)
 {
-  const std::vector<std::string> state_data_names{"x_",     "y_",      "z_",   "length_",
+  static const std::array<std::string, 12> state_data_names{"x_",     "y_",      "z_",   "length_",
                                                   "width_", "height_", "yaw_", "vx_",
                                                   "vy_",    "ax_",     "ay_",  "is_valid_"};
 
