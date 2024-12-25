@@ -24,7 +24,6 @@
 #include <array>
 #include <cstddef>
 #include <limits>
-#include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -142,9 +141,8 @@ private:
 /**
  * @brief A class to represent the state history of an agent.
  */
-class AgentHistory
+struct AgentHistory
 {
-public:
   /**
    * @brief Construct a new Agent History filling the latest state by input state.
    *
@@ -161,9 +159,9 @@ public:
     label_id_(label_id),
     latest_time_(current_time),
     max_time_length_(max_time_length),
-    queue_ptr_(std::make_unique<FixedQueue<AgentState>>(FixedQueue<AgentState>(max_time_length)))
+    queue_(FixedQueue<AgentState>(max_time_length))
   {
-    queue_ptr_->push_back(state);
+    queue_.push_back(state);
   }
 
   ~AgentHistory() = default;
@@ -207,7 +205,7 @@ public:
    */
   void update(double current_time, const AgentState & state) noexcept
   {
-    queue_ptr_->push_back(state);
+    queue_.push_back(state);
     latest_time_ = current_time;
   }
 
@@ -215,14 +213,14 @@ public:
   void update_empty() noexcept
   {
     const auto state = AgentState::empty();
-    queue_ptr_->push_back(state);
+    queue_.push_back(state);
   }
 
   // Return a history states as an array.
   std::vector<float> as_array() const noexcept
   {
     std::vector<float> output;
-    for (const auto & state : *queue_ptr_) {
+    for (const auto & state : queue_) {
       for (const auto & v : state.as_array()) {
         output.push_back(v);
       }
@@ -240,6 +238,7 @@ public:
    */
   bool is_ancient(double current_time, double threshold) const
   {
+    /* TODO: Raise error if the current time is smaller than latest */
     return current_time - latest_time_ >= threshold;
   }
 
@@ -249,19 +248,18 @@ public:
    * @return true If the end of element is 1.0f.
    * @return false Otherwise.
    */
-  bool is_valid_latest() const { return queue_ptr_->end()->is_valid(); }
+  bool is_valid_latest() const { return get_latest_state().is_valid(); }
 
   // Get the latest agent state at `T`.
-  const AgentState & get_latest_state() const { return *queue_ptr_->end(); }
+  const AgentState & get_latest_state() const { return *queue_.end(); }
 
   // Get the latest agent state at `T`.
   std::optional<AgentState> get_latest_valid_state() const
   {
     auto latest_valid_state = std::find_if(
-      queue_ptr_->rbegin(), queue_ptr_->rend(),
-      [](const auto & state) { return state.is_valid(); });
-    return (latest_valid_state != queue_ptr_->rend()) ? std::make_optional(*latest_valid_state)
-                                                      : std::nullopt;
+      queue_.rbegin(), queue_.rend(), [](const auto & state) { return state.is_valid(); });
+    return (latest_valid_state != queue_.rend()) ? std::make_optional(*latest_valid_state)
+                                                 : std::nullopt;
   }
 
 private:
@@ -269,7 +267,7 @@ private:
   const size_t label_id_;
   double latest_time_;
   const size_t max_time_length_;
-  const std::unique_ptr<FixedQueue<AgentState>> queue_ptr_;
+  FixedQueue<AgentState> queue_;
 };
 
 /**
