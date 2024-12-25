@@ -121,7 +121,7 @@ struct AgentState
   float ay() const { return acceleration_.y; }
 
   // Return `true` if the value is `1.0`.
-  bool is_valid() const { return is_valid_ == 1.0; }
+  bool is_valid() const { return is_valid_ > std::numeric_limits<float>::epsilon(); }
 
   // Return the state attribute as an array.
   std::array<float, AgentStateDim> as_array() const noexcept

@@ -36,6 +36,14 @@ public:
 
   explicit FixedQueue(size_type size) : queue_(size) {}
 
+  ~FixedQueue() = default;
+
+  FixedQueue(const FixedQueue & other) = default;
+  FixedQueue & operator=(const FixedQueue & other) = default;
+
+  FixedQueue(FixedQueue && other) noexcept = default;
+  FixedQueue & operator=(FixedQueue && other) noexcept = default;
+
   void push_back(const T && t) noexcept
   {
     queue_.pop_front();
