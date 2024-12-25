@@ -179,15 +179,10 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
   }
 
   const auto target_indices = extractTargetAgent(histories);
-<<<<<<< Updated upstream
-  if (target_indices.empty()) {
-    RCLCPP_WARN(get_logger(), "No target agents");
-=======
   if (target_indices.size() != NUM_TARGET) {
     RCLCPP_WARN(
       get_logger(), "Found target size mismatch, %zu targets were extracted, but %zu were expected",
       target_indices.size(), NUM_TARGET);
->>>>>>> Stashed changes
     return;
   }
 
