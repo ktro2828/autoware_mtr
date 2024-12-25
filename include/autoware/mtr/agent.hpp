@@ -164,6 +164,14 @@ struct AgentHistory
     queue_.push_back(state);
   }
 
+  ~AgentHistory() = default;
+
+  AgentHistory(const AgentHistory & other) = default;
+  AgentHistory & operator=(const AgentHistory & other) = delete;
+
+  AgentHistory(AgentHistory && other) noexcept = default;
+  AgentHistory & operator=(AgentHistory && other) noexcept = delete;
+
   // Return the history time length `T`.
   size_t length() const { return max_time_length_; }
 
