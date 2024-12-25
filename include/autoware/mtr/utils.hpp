@@ -39,18 +39,22 @@ namespace autoware::mtr::utils
 {
 
 inline void print_data(
-  const float * data, const std::string & obj_name, const size_t num_timestamps = 1)
+  const std::vector<float> & data, const std::string & obj_name, const size_t num_timestamps = 1)
 {
-  static const std::array<std::string, 12> state_data_names{"x_",     "y_",      "z_",   "length_",
-                                                  "width_", "height_", "yaw_", "vx_",
-                                                  "vy_",    "ax_",     "ay_",  "is_valid_"};
+  static const std::array<std::string, 12> state_data_names{
+    "x_",   "y_",  "z_",  "length_", "width_", "height_",
+    "yaw_", "vx_", "vy_", "ax_",     "ay_",    "is_valid_"};
 
+  if (static_cast<size_t>(data.size()) != num_timestamps * state_data_names.size()) {
+    std::cerr << "Data size mismatch\n";
+    return;
+  }
   std::cerr << "-----------------\n";
   std::cerr << "Object " << obj_name << "\n";
   for (size_t t = 0; t < num_timestamps; ++t) {
     size_t i{0};
     for (const auto & name : state_data_names) {
-      std::cerr << name << " " << data[t * state_data_names.size() + i] << ",";
+      std::cerr << name << " " << data.at(t * state_data_names.size() + i) << ",";
       ++i;
     }
     std::cerr << "\n-----------------\n";
@@ -84,7 +88,10 @@ inline void print_agent_data(const AgentData & agent_data)
   const auto & t = agent_data.time_length();
   const auto target_data_ptr = agent_data.target_data_ptr();
   const auto ego_data_ptr = agent_data.ego_data_ptr();
-  print_data(ego_data_ptr, "EGO", t);
+  std::vector<float> ego_data(d * t);
+  std::copy(ego_data_ptr, ego_data_ptr + (d * t), ego_data.begin());
+
+  print_data(ego_data, "EGO", t);
   for (const auto & idx : agent_data.target_indices()) {
     // Compute the starting address of the n-th object's data
     std::vector<float> object_data(d * t);
