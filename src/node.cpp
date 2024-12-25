@@ -41,7 +41,7 @@ namespace autoware::mtr
 {
 // TODO(ktro2828): use a parameter
 constexpr double TIME_THRESHOLD = 1.0;
-constexpr size_t MAX_NUM_TARGET = 1;
+constexpr size_t MAX_NUM_TARGET = 2;
 constexpr double POLYLINE_DISTANCE_THRESHOLD = 100.0;
 namespace
 {
