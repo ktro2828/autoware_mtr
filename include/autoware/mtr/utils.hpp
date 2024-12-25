@@ -87,9 +87,9 @@ inline void print_agent_data(const AgentData & agent_data)
   print_data(ego_data_ptr, "EGO", t);
   for (const auto & idx : agent_data.target_indices()) {
     // Compute the starting address of the n-th object's data
-    auto object_data = new float[d * t];
+    std::vector<float> object_data(d * t);
     const float * object_start = target_data_ptr + (idx * d * t);
-    std::memcpy(object_data, object_start, d * t * sizeof(float));
+    std::copy(object_start, object_start + (d * t), object_data.begin());
     print_data(object_data, "object# " + std::to_string(idx), t);
   }
 }
