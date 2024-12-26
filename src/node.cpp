@@ -320,6 +320,19 @@ void MTRNode::updateAgentHistory(
   const TrackedObject & ego_msg)
 {
   std::vector<std::string> observed_ids;
+
+  // ego vehicle
+  observed_ids.emplace_back(EGO_ID);
+  object_msg_map_.insert_or_assign(EGO_ID, ego_msg);
+
+  const auto ego = createAgentState(ego_msg, true);
+  if (agent_history_map_.count(EGO_ID) == 0) {
+    AgentHistory history(ego, EGO_ID, AgentLabel::VEHICLE, current_time, config_ptr_->num_past);
+    agent_history_map_.emplace(EGO_ID, history);
+  } else {
+    agent_history_map_.at(EGO_ID).update(current_time, ego);
+  }
+
   // other agents
   for (const auto & object : objects_msg->objects) {
     auto label_index = getLabelIndex(object);
@@ -338,18 +351,6 @@ void MTRNode::updateAgentHistory(
     } else {
       agent_history_map_.at(object_id).update(current_time, state);
     }
-  }
-
-  // ego vehicle
-  observed_ids.emplace_back(EGO_ID);
-  object_msg_map_.insert_or_assign(EGO_ID, ego_msg);
-
-  const auto ego = createAgentState(ego_msg, true);
-  if (agent_history_map_.count(EGO_ID) == 0) {
-    AgentHistory history(ego, EGO_ID, AgentLabel::VEHICLE, current_time, config_ptr_->num_past);
-    agent_history_map_.emplace(EGO_ID, history);
-  } else {
-    agent_history_map_.at(EGO_ID).update(current_time, ego);
   }
 
   // update unobserved histories with empty
