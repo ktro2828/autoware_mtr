@@ -48,7 +48,7 @@ __global__ void agentPreprocessKernel(
   const float is_valid = in_trajectory[src_trajectory_idx + 11];
 
   // extract targets trajectories
-  const int center_idx = (target_index[b] * T + T - 1) * D;
+  const int center_idx = (n * T + T - 1) * D;
   const float center_x = in_trajectory[center_idx];
   const float center_y = in_trajectory[center_idx + 1];
   const float center_z = in_trajectory[center_idx + 2];
