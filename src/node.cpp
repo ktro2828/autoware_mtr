@@ -166,7 +166,8 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
   int tmp_ego_index = -1;
   for (const auto & [object_id, history] : agent_history_map_) {
     object_ids.emplace_back(object_id);
-    histories.emplace_back(history);
+    histories.emplace_back(
+      history.as_array(), object_id, history.label_id(), current_time, history.length());
     label_ids.emplace_back(history.label_id());
     if (object_id == EGO_ID) {
       tmp_ego_index = histories.size() - 1;

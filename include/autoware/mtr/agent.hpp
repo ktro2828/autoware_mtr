@@ -56,7 +56,23 @@ enum AgentDimLabels {
 struct AgentState
 {
   // Construct a new instance filling all elements by `0.0f`.
-  AgentState() {}
+  AgentState() = default;
+
+  explicit AgentState(const std::vector<float> & info_array)
+  {
+    position_.x = info_array.at(0);
+    position_.y = info_array.at(1);
+    position_.z = info_array.at(2);
+    dimension_.x = info_array.at(3);
+    dimension_.y = info_array.at(4);
+    dimension_.z = info_array.at(5);
+    yaw_ = info_array.at(6);
+    velocity_.x = info_array.at(7);
+    velocity_.y = info_array.at(8);
+    acceleration_.x = info_array.at(9);
+    acceleration_.y = info_array.at(10);
+    is_valid_ = info_array.at(11);
+  }
 
   /**
    * @brief Construct a new instance with specified values.
@@ -152,6 +168,25 @@ struct AgentHistory
    * @param current_time Current timestamp.
    * @param max_time_length History length.
    */
+  AgentHistory(
+    const std::vector<float> & state_array, const std::string & object_id, const size_t label_id,
+    const double current_time, const size_t max_time_length)
+  : object_id_(object_id),
+    label_id_(label_id),
+    latest_time_(current_time),
+    max_time_length_(max_time_length)
+  {
+    queue_.set_size(max_time_length);
+    for (size_t i = 0; i < max_time_length; ++i) {
+      const auto start = i * AgentStateDim;
+      const auto end = start + AgentStateDim;
+      const AgentState state(std::vector<float>(
+        state_array.begin() + static_cast<std::vector<float>::difference_type>(start),
+        state_array.begin() + static_cast<std::vector<float>::difference_type>(end)));
+      queue_.push_back(state);
+    }
+  }
+
   AgentHistory(
     const AgentState & state, const std::string & object_id, const size_t label_id,
     const double current_time, const size_t max_time_length)
