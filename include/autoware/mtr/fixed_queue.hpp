@@ -15,7 +15,6 @@
 #ifndef AUTOWARE__MTR__FIXED_QUEUE_HPP_
 #define AUTOWARE__MTR__FIXED_QUEUE_HPP_
 
-#include <cstddef>
 #include <deque>
 #include <iterator>
 
@@ -34,22 +33,13 @@ public:
   using const_iterator = typename std::deque<T>::const_iterator;
   using rconst_iterator = typename std::reverse_iterator<const_iterator>;
 
-  explicit FixedQueue(size_t size) : size_(size) { queue_.resize(size); }
+  explicit FixedQueue(size_t size) : size_(size) {}
 
-  explicit FixedQueue() = default;
-
+  FixedQueue() = default;
   ~FixedQueue() = default;
 
-  FixedQueue(const FixedQueue & other) { queue_ = other.queue_; }
-
-  FixedQueue & operator=(const FixedQueue & other)
-  {
-    if (this != &other) {
-      queue_ = other.queue_;
-      size_ = other.size_;
-    }
-    return *this;
-  }
+  FixedQueue(const FixedQueue & other) = default;
+  FixedQueue & operator=(const FixedQueue & other) = default;
 
   FixedQueue(FixedQueue && other) noexcept = default;
   FixedQueue & operator=(FixedQueue && other) noexcept = default;
@@ -103,12 +93,16 @@ public:
   void set_size(size_t size)
   {
     size_ = size;
-    queue_.resize(size);
+    while (queue_.size() > size_) {
+      queue_.pop_front();
+    }
   }
 
 private:
   std::deque<T> queue_;
-  size_t size_;
+  size_t size_ = 0;
 };
+
 }  // namespace autoware::mtr
+
 #endif  // AUTOWARE__MTR__FIXED_QUEUE_HPP_
