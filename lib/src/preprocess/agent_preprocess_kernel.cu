@@ -77,7 +77,7 @@ __global__ void agentPreprocessKernel(
   const int onehot_idx = out_idx + 6;
   out_data[onehot_idx + object_type_index[n]] = 1.0f;
 
-  if (target_index[b] == n) {
+  if (b == n) {
     out_data[onehot_idx + C] = 1.0f;
   }
 
