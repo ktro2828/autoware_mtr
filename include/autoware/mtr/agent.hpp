@@ -184,6 +184,7 @@ struct AgentHistory
         state_array.begin() + static_cast<std::vector<float>::difference_type>(start),
         state_array.begin() + static_cast<std::vector<float>::difference_type>(end)));
       queue_.push_back(state);
+      is_valid_latest_ = state.is_valid();
     }
   }
 
@@ -197,6 +198,7 @@ struct AgentHistory
   {
     queue_.set_size(max_time_length);
     queue_.push_back(state);
+    is_valid_latest_ = state.is_valid();
   }
 
   ~AgentHistory() = default;
@@ -283,7 +285,7 @@ struct AgentHistory
    * @return true If the end of element is 1.0f.
    * @return false Otherwise.
    */
-  bool is_valid_latest() const { return get_latest_state().is_valid(); }
+  bool is_valid_latest() const { return is_valid_latest_; }
 
   // Get the latest agent state at `T`.
   const AgentState & get_latest_state() const { return queue_.back(); }
@@ -302,6 +304,7 @@ private:
   const size_t label_id_;
   double latest_time_;
   const size_t max_time_length_;
+  bool is_valid_latest_{false};
   FixedQueue<AgentState> queue_;
 };
 
