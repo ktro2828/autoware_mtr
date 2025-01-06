@@ -209,8 +209,8 @@ private:
    * @return std::vector<LanePoint>
    */
   std::vector<LanePoint> fromLinestring(
-    const lanelet::ConstLineString3d & linestring, const geometry_msgs::msg::Point & position,
-    double distance_threshold) const noexcept;
+    const lanelet::ConstLineString3d & linestring, const float polyline_label,
+    const geometry_msgs::msg::Point & position, double distance_threshold) const noexcept;
 
   /**
    * @brief Convert a polygon to the set of polylines.
