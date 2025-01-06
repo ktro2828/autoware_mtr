@@ -18,12 +18,46 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <string>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 
 namespace autoware::mtr
 {
 constexpr size_t PointStateDim = 7;
+
+enum class MapType {
+  ROADWAY = 0,
+  BUS_LANE = 1,
+  BIKE_LANE = 2,
+  DASH_SOLID = 3,
+  DASHED = 4,
+  DOUBLE_DASH = 5,
+  SOLID = 6,
+  DOUBLE_SOLID = 7,
+  SOLID_DASH = 8,
+  CROSSWALK = 9,
+  UNKNOWN = 10
+};
+
+const std::array<std::string, 4> T4_LANE = {"road", "highway", "road_shoulder", "bicycle_lane"};
+const std::array<std::string, 4> T4_ROADLINE = {"dashed", "solid", "dashed_dashed", "virtual"};
+const std::array<std::string, 1> T4_ROADEDGE = {"road_border"};
+
+const std::unordered_map<std::string, MapType> g_map_type_mapping = {
+  {"road", MapType::ROADWAY},
+  {"highway", MapType::ROADWAY},
+  {"road_shoulder", MapType::ROADWAY},
+  {"bicycle_lane", MapType::BIKE_LANE},
+  {"dashed", MapType::DASHED},
+  {"solid", MapType::SOLID},
+  {"dashed_dashed", MapType::DOUBLE_DASH},
+  {"virtual", MapType::UNKNOWN},
+  {"road_border", MapType::SOLID},
+  {"crosswalk", MapType::CROSSWALK},
+  {"unknown", MapType::UNKNOWN},
+};
 
 enum PolylineLabel { LANE = 0, ROAD_LINE = 1, ROAD_EDGE = 2, CROSSWALK = 3 };
 
@@ -46,7 +80,29 @@ struct LanePoint
   LanePoint(
     const float x, const float y, const float z, const float dx, const float dy, const float dz,
     const float label)
-  : data_({x, y, z, dx, dy, dz, label}), x_(x), y_(y), z_(z), label_(label)
+  : x_(x), y_(y), z_(z), label_(label), data_({x, y, z, dx, dy, dz, label})
+  {
+  }
+
+  /**
+   * @brief Construct a new instance with specified values.
+   *
+   * @param x X position.
+   * @param y Y position.
+   * @param z Z position.
+   * @param dx Normalized delta x.
+   * @param dy Normalized delta y.
+   * @param dz Normalized delta z.
+   * @param label Label.
+   */
+  LanePoint(
+    const float x, const float y, const float z, const float dx, const float dy, const float dz,
+    const std::string & label)
+  : x_(x),
+    y_(y),
+    z_(z),
+    label_(static_cast<float>(g_map_type_mapping.at(label))),
+    data_({x, y, z, dx, dy, dz, label_})
   {
   }
 
@@ -83,8 +139,8 @@ struct LanePoint
   const float * data_ptr() const noexcept { return data_.data(); }
 
 private:
-  std::array<float, PointStateDim> data_;
   float x_{0.0f}, y_{0.0f}, z_{0.0f}, label_{0.0f};
+  std::array<float, PointStateDim> data_;
 };
 
 struct PolylineData
