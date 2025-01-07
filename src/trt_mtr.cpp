@@ -289,7 +289,6 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
       agent_data.state_dim(), d_target_state_.get(), d_in_polyline_.get(),
       d_in_polyline_mask_.get(), d_in_polyline_center_.get(), stream_));
   }
-
   // Check for NaN or invalid values in d_in_polyline_center_
   {
     std::vector<float> host_buffer(num_target_ * max_num_polyline_ * 3);
@@ -297,7 +296,49 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
       host_buffer.data(), d_in_polyline_center_.get(),
       num_target_ * max_num_polyline_ * 3 * sizeof(float), cudaMemcpyDeviceToHost);
     for (const auto & val : host_buffer) {
-      if (std::isnan(val)) {
+      if (std::isnan(val) || std::abs(val) > 1000) {
+        std::cerr << "Invalid value found in d_in_polyline_center_" << std::endl;
+        return false;
+      }
+    }
+  }
+
+  // Check for NaN or invalid values in d_in_polyline_
+  {
+    std::vector<float> host_buffer(num_target_ * max_num_polyline_ * num_point_ * num_point_attr_);
+    cudaMemcpy(
+      host_buffer.data(), d_in_polyline_.get(),
+      num_target_ * max_num_polyline_ * num_point_ * num_point_attr_ * sizeof(float),
+      cudaMemcpyDeviceToHost);
+    for (const auto & val : host_buffer) {
+      if (std::isnan(val) || std::abs(val) > 1000) {
+        std::cerr << "Invalid value found in d_in_polyline_" << std::endl;
+        return false;
+      }
+    }
+  }
+
+  // Check for NaN or invalid values in d_intention_point_
+  {
+    std::vector<float> host_buffer(num_target_ * intention_point_.size());
+    cudaMemcpy(
+      host_buffer.data(), d_intention_point_.get(),
+      num_target_ * intention_point_.size() * sizeof(float), cudaMemcpyDeviceToHost);
+    for (const auto & val : host_buffer) {
+      if (std::isnan(val) || std::abs(val) > 1000) {
+        std::cerr << "Invalid value found in d_intention_point_" << std::endl;
+        return false;
+      }
+    }
+  }
+  // Check for NaN or invalid values in d_in_polyline_center_
+  {
+    std::vector<float> host_buffer(num_target_ * max_num_polyline_ * 3);
+    cudaMemcpy(
+      host_buffer.data(), d_in_polyline_center_.get(),
+      num_target_ * max_num_polyline_ * 3 * sizeof(float), cudaMemcpyDeviceToHost);
+    for (const auto & val : host_buffer) {
+      if (std::isnan(val) || std::abs(val) > 1000) {
         std::cerr << "NaN found in d_in_polyline_center_" << std::endl;
         return false;
       }
