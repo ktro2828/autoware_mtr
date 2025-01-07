@@ -292,21 +292,21 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
   }
 
   // // Check for NaN or invalid values in d_in_polyline_center_
-  // {
-  //   std::vector<float> host_buffer(num_target_ * max_num_polyline_ * 3);
-  //   cudaMemcpy(
-  //     host_buffer.data(), d_in_polyline_center_.get(),
-  //     num_target_ * max_num_polyline_ * 3 * sizeof(float), cudaMemcpyDeviceToHost);
+  {
+    std::vector<float> host_buffer(num_target_ * max_num_polyline_ * 3);
+    cudaMemcpy(
+      host_buffer.data(), d_in_polyline_center_.get(),
+      num_target_ * max_num_polyline_ * 3 * sizeof(float), cudaMemcpyDeviceToHost);
 
-  //   for (const auto & val : host_buffer) {
-  //     if (std::isnan(val) || std::abs(val) > 1000) {
-  //       std::cerr << "NaN found in d_in_polyline_center_" << std::endl;
-  //       if (!std::isnan(val)) {
-  //         std::cerr << "high value " << val << std::endl;
-  //       }
-  //     }
-  //   }
-  // }
+    for (const auto & val : host_buffer) {
+      if (std::isnan(val) || std::abs(val) > 1000) {
+        std::cerr << "NaN found in d_in_polyline_center_" << std::endl;
+        if (!std::isnan(val)) {
+          std::cerr << "high value " << val << std::endl;
+        }
+      }
+    }
+  }
 
   // Check for NaN or invalid values in d_in_polyline_
   {
