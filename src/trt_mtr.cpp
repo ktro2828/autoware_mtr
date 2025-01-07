@@ -302,16 +302,16 @@ bool TrtMTR::postProcess(
 
     // Step 2: Copy data from GPU to host
     cudaMemcpy(
-      host_buffer.data(), d_in_trajectory_.get(), B * M * T * D * sizeof(float),
+      host_buffer.data(), d_out_trajectory_.get(), B * M * T * D * sizeof(float),
       cudaMemcpyDeviceToHost);
 
-    std::cerr << "Preprocessed output \n";
+    std::cerr << "Postprocessed output \n";
     std::vector<std::string> values{"x", "y", "xmean", "ymean", "std_dev", "vx", "vy"};
     for (int b = 0; b < B; b++) {
       for (int m = 0; m < M; m++) {
         std::cerr << "{b: " << b;
         std::cerr << ",m: " << m << ": \n";
-        for (int t = 0; t < T; t++) {
+        for (int t = 0; t < T; ++t) {
           for (size_t i = 0; i < D; ++i) {
             std::cerr << values[i] << ": " << host_buffer[b * M * T * D + (m * T + t) * D + i]
                       << ",";
