@@ -323,32 +323,32 @@ bool TrtMTR::postProcess(
         std::cerr << "}\n";
       }
     }
-
-    CHECK_CUDA_ERROR(cudaStreamSynchronize(stream_));
-
-    h_out_score_.clear();
-    h_out_trajectory_.clear();
-    h_out_score_.resize(num_target_ * num_mode_);
-    h_out_trajectory_.resize(num_target_ * num_mode_ * num_future_ * PredictedStateDim);
-
-    CHECK_CUDA_ERROR(cudaMemcpy(
-      h_out_score_.data(), d_out_score_.get(), sizeof(float) * num_target_ * num_mode_,
-      cudaMemcpyDeviceToHost));
-    CHECK_CUDA_ERROR(cudaMemcpy(
-      h_out_trajectory_.data(), d_out_trajectory_.get(),
-      sizeof(float) * num_target_ * num_mode_ * num_future_ * PredictedStateDim,
-      cudaMemcpyDeviceToHost));
-
-    trajectories.clear();
-    trajectories.reserve(num_target_);
-    for (auto b = 0; b < num_target_; ++b) {
-      const auto score_itr = h_out_score_.cbegin() + b * num_mode_;
-      const std::vector<double> scores(score_itr, score_itr + num_mode_);
-      const auto mode_itr =
-        h_out_trajectory_.cbegin() + b * num_mode_ * num_future_ * PredictedStateDim;
-      std::vector<double> modes(mode_itr, mode_itr + num_mode_ * num_future_ * PredictedStateDim);
-      trajectories.emplace_back(scores, modes, num_mode_, num_future_);
-    }
-    return true;
   }
+  CHECK_CUDA_ERROR(cudaStreamSynchronize(stream_));
+
+  h_out_score_.clear();
+  h_out_trajectory_.clear();
+  h_out_score_.resize(num_target_ * num_mode_);
+  h_out_trajectory_.resize(num_target_ * num_mode_ * num_future_ * PredictedStateDim);
+
+  CHECK_CUDA_ERROR(cudaMemcpy(
+    h_out_score_.data(), d_out_score_.get(), sizeof(float) * num_target_ * num_mode_,
+    cudaMemcpyDeviceToHost));
+  CHECK_CUDA_ERROR(cudaMemcpy(
+    h_out_trajectory_.data(), d_out_trajectory_.get(),
+    sizeof(float) * num_target_ * num_mode_ * num_future_ * PredictedStateDim,
+    cudaMemcpyDeviceToHost));
+
+  trajectories.clear();
+  trajectories.reserve(num_target_);
+  for (auto b = 0; b < num_target_; ++b) {
+    const auto score_itr = h_out_score_.cbegin() + b * num_mode_;
+    const std::vector<double> scores(score_itr, score_itr + num_mode_);
+    const auto mode_itr =
+      h_out_trajectory_.cbegin() + b * num_mode_ * num_future_ * PredictedStateDim;
+    std::vector<double> modes(mode_itr, mode_itr + num_mode_ * num_future_ * PredictedStateDim);
+    trajectories.emplace_back(scores, modes, num_mode_, num_future_);
+  }
+  return true;
+}
 }  // namespace autoware::mtr
