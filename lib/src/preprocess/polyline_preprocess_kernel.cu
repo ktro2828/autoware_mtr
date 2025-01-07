@@ -197,7 +197,7 @@ __global__ void calculatePolylineCenterKernel(
   }
 
   // calculate polyline center
-  float sumX = 0.0f, sumY = 0.0f, sumZ = 0.0f;
+  double sumX = 0.0, sumY = 0.0, sumZ = 0.0;
   int numValid = 0;
   for (int p = 0; p < P; ++p) {
     int idx = b * K * P + k * P + p;
@@ -209,9 +209,9 @@ __global__ void calculatePolylineCenterKernel(
     }
   }
 
-  center[centerIdx] = sumX / fmaxf(1.0f, numValid);
-  center[centerIdx + 1] = sumY / fmaxf(1.0f, numValid);
-  center[centerIdx + 2] = sumZ / fmaxf(1.0f, numValid);
+  center[centerIdx] = static_cast<float>(sumX / fmaxf(1.0f, numValid));
+  center[centerIdx + 1] = static_cast<float>(sumY / fmaxf(1.0f, numValid));
+  center[centerIdx + 2] = static_cast<float>(sumZ / fmaxf(1.0f, numValid));
 }
 
 cudaError_t polylinePreprocessWithTopkLauncher(
