@@ -221,8 +221,8 @@ private:
    * @return std::vector<LanePoint>
    */
   std::vector<LanePoint> fromPolygon(
-    const lanelet::CompoundPolygon3d & polygon, const geometry_msgs::msg::Point & position,
-    double distance_threshold) const noexcept;
+    const lanelet::CompoundPolygon3d & polygon, const float label_id,
+    const geometry_msgs::msg::Point & position, double distance_threshold) const noexcept;
 
   lanelet::LaneletMapConstPtr lanelet_map_ptr_;  //!< Pointer of lanelet map.
   size_t max_num_polyline_;                      //!< The max number of polylines.
