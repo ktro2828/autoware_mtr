@@ -293,31 +293,60 @@ bool TrtMTR::postProcess(
     num_target_, num_mode_, num_future_, agent_data.state_dim(), d_target_state_.get(),
     PredictedStateDim, d_out_trajectory_.get(), stream_));
 
-  CHECK_CUDA_ERROR(cudaStreamSynchronize(stream_));
+  {
+    auto B = num_target_;
+    auto M = num_mode_;
+    auto T = num_future_;
+    auto D = agent_data.state_dim();
+    std::vector<float> host_buffer(B * M * T * D);
 
-  h_out_score_.clear();
-  h_out_trajectory_.clear();
-  h_out_score_.resize(num_target_ * num_mode_);
-  h_out_trajectory_.resize(num_target_ * num_mode_ * num_future_ * PredictedStateDim);
+    // Step 2: Copy data from GPU to host
+    cudaMemcpy(
+      host_buffer.data(), d_in_trajectory_.get(), B * M * T * D * sizeof(float),
+      cudaMemcpyDeviceToHost);
 
-  CHECK_CUDA_ERROR(cudaMemcpy(
-    h_out_score_.data(), d_out_score_.get(), sizeof(float) * num_target_ * num_mode_,
-    cudaMemcpyDeviceToHost));
-  CHECK_CUDA_ERROR(cudaMemcpy(
-    h_out_trajectory_.data(), d_out_trajectory_.get(),
-    sizeof(float) * num_target_ * num_mode_ * num_future_ * PredictedStateDim,
-    cudaMemcpyDeviceToHost));
+    std::cerr << "Preprocessed output \n";
+    std::vector<std::string> values{"x", "y", "xmean", "ymean", "std_dev", "vx", "vy"};
+    for (int b = 0; b < B; b++) {
+      for (int m = 0; m < M; m++) {
+        std::cerr << "{b: " << b;
+        std::cerr << ",m: " << m << ": \n";
+        for (int t = 0; t < T; t++) {
+          for (size_t i = 0; i < D; ++i) {
+            std::cerr << values[i] << ": " << host_buffer[b * M * T * D + (m * T + t) * D + i]
+                      << ",";
+          }
+          std::cerr << "\n";
+        }
+        std::cerr << "}\n";
+      }
+    }
 
-  trajectories.clear();
-  trajectories.reserve(num_target_);
-  for (auto b = 0; b < num_target_; ++b) {
-    const auto score_itr = h_out_score_.cbegin() + b * num_mode_;
-    const std::vector<double> scores(score_itr, score_itr + num_mode_);
-    const auto mode_itr =
-      h_out_trajectory_.cbegin() + b * num_mode_ * num_future_ * PredictedStateDim;
-    std::vector<double> modes(mode_itr, mode_itr + num_mode_ * num_future_ * PredictedStateDim);
-    trajectories.emplace_back(scores, modes, num_mode_, num_future_);
+    CHECK_CUDA_ERROR(cudaStreamSynchronize(stream_));
+
+    h_out_score_.clear();
+    h_out_trajectory_.clear();
+    h_out_score_.resize(num_target_ * num_mode_);
+    h_out_trajectory_.resize(num_target_ * num_mode_ * num_future_ * PredictedStateDim);
+
+    CHECK_CUDA_ERROR(cudaMemcpy(
+      h_out_score_.data(), d_out_score_.get(), sizeof(float) * num_target_ * num_mode_,
+      cudaMemcpyDeviceToHost));
+    CHECK_CUDA_ERROR(cudaMemcpy(
+      h_out_trajectory_.data(), d_out_trajectory_.get(),
+      sizeof(float) * num_target_ * num_mode_ * num_future_ * PredictedStateDim,
+      cudaMemcpyDeviceToHost));
+
+    trajectories.clear();
+    trajectories.reserve(num_target_);
+    for (auto b = 0; b < num_target_; ++b) {
+      const auto score_itr = h_out_score_.cbegin() + b * num_mode_;
+      const std::vector<double> scores(score_itr, score_itr + num_mode_);
+      const auto mode_itr =
+        h_out_trajectory_.cbegin() + b * num_mode_ * num_future_ * PredictedStateDim;
+      std::vector<double> modes(mode_itr, mode_itr + num_mode_ * num_future_ * PredictedStateDim);
+      trajectories.emplace_back(scores, modes, num_mode_, num_future_);
+    }
+    return true;
   }
-  return true;
-}
 }  // namespace autoware::mtr
