@@ -277,12 +277,14 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     }
   }
   if (max_num_polyline_ < num_polyline_) {
+    std::cerr << "Using topk\n";
     CHECK_CUDA_ERROR(polylinePreprocessWithTopkLauncher(
       max_num_polyline_, num_polyline_, num_point_, polyline_data.state_dim(), d_polyline_.get(),
       num_target_, agent_data.state_dim(), d_target_state_.get(), d_tmp_polyline_.get(),
       d_tmp_polyline_mask_.get(), d_tmp_distance_.get(), d_in_polyline_.get(),
       d_in_polyline_mask_.get(), d_in_polyline_center_.get(), stream_));
   } else {
+    std::cerr << "Using normal\n";
     CHECK_CUDA_ERROR(polylinePreprocessLauncher(
       num_polyline_, num_point_, polyline_data.state_dim(), d_polyline_.get(), num_target_,
       agent_data.state_dim(), d_target_state_.get(), d_in_polyline_.get(),
