@@ -263,10 +263,13 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     for (int b = 0; b < B; b++) {
       for (int n = 0; n < N; n++) {
         std::cerr << "{b: " << b;
-        std::cerr << ",n: " << n << ": ";
-        for (int i = 0; i < 29; ++i) {
-          std::cerr << values[i] << ": " << host_buffer[b * N * T * 29 + (n * T + T - 1) * 29 + i]
-                    << ",";
+        std::cerr << ",n: " << n << ": \n";
+        for (int t = 0; t < T; ++t) {
+          for (int i = 0; i < 29; ++i) {
+            std::cerr << values[i] << ": " << host_buffer[b * N * T * 29 + (n * T + t) * 29 + i]
+                      << ",";
+          }
+          std::cerr << "\n";
         }
         std::cerr << "}\n";
       }
@@ -294,39 +297,40 @@ bool TrtMTR::postProcess(
     num_target_, num_mode_, num_future_, agent_data.state_dim(), d_target_state_.get(),
     PredictedStateDim, d_out_trajectory_.get(), stream_));
 
-  {
-    auto B = num_target_;
-    auto M = num_mode_;
-    auto T = num_future_;
-    auto D = agent_data.state_dim();
-    std::vector<float> host_buffer(B * M * T * D);
+  // {
+  //   auto B = num_target_;
+  //   auto M = num_mode_;
+  //   auto T = num_future_;
+  //   auto D = agent_data.state_dim();
+  //   std::vector<float> host_buffer(B * M * T * D);
 
-    // Step 2: Copy data from GPU to host
-    cudaMemcpy(
-      host_buffer.data(), d_out_trajectory_.get(),
-      num_target_ * num_mode_ * num_future_ * PredictedStateDim * sizeof(float),
-      cudaMemcpyDeviceToHost);
+  //   // Step 2: Copy data from GPU to host
+  //   cudaMemcpy(
+  //     host_buffer.data(), d_out_trajectory_.get(),
+  //     num_target_ * num_mode_ * num_future_ * PredictedStateDim * sizeof(float),
+  //     cudaMemcpyDeviceToHost);
 
-    std::cerr << "Postprocessed output \n";
-    std::vector<std::string> values{"x", "y", "xmean", "ymean", "std_dev", "vx", "vy"};
-    for (int b = 0; b < B; b++) {
-      for (int m = 0; m < M; m++) {
-        std::cerr << "{b: " << b;
-        std::cerr << ",m: " << m << "\n";
-        for (size_t d = 0; d < D; ++d) {
-          auto idx = b * M * T * D + m * T * D + d;
-          auto value = host_buffer[idx];
-          if (std::isnan(value)) {
-            std::cerr << "NAN detected\n";
-            break;
-          }
-          std::cerr << values[d] << ": " << value << ",";
-        }
+  //   std::cerr << "Postprocessed output \n";
+  //   std::vector<std::string> values{"x", "y", "xmean", "ymean", "std_dev", "vx", "vy"};
+  //   for (int b = 0; b < B; b++) {
+  //     for (int m = 0; m < M; m++) {
+  //       std::cerr << "{b: " << b;
+  //       std::cerr << ",m: " << m << "\n";
+  //       for (size_t d = 0; d < D; ++d) {
+  //         auto idx = b * M * T * D + m * T * D + d;
+  //         std::cerr << "idx " << idx << "\n";
+  //         auto value = host_buffer[idx];
+  //         if (std::isnan(value)) {
+  //           std::cerr << "NAN detected\n";
+  //           break;
+  //         }
+  //         std::cerr << values[d] << ": " << value << ",";
+  //       }
 
-        std::cerr << "}\n";
-      }
-    }
-  }
+  //       std::cerr << "}\n";
+  //     }
+  //   }
+  // }
   CHECK_CUDA_ERROR(cudaStreamSynchronize(stream_));
 
   h_out_score_.clear();
@@ -344,12 +348,27 @@ bool TrtMTR::postProcess(
 
   trajectories.clear();
   trajectories.reserve(num_target_);
+  std::vector<std::string> values{"x", "y", "xmean", "ymean", "std_dev", "vx", "vy"};
+
   for (auto b = 0; b < num_target_; ++b) {
     const auto score_itr = h_out_score_.cbegin() + b * num_mode_;
     const std::vector<double> scores(score_itr, score_itr + num_mode_);
     const auto mode_itr =
       h_out_trajectory_.cbegin() + b * num_mode_ * num_future_ * PredictedStateDim;
     std::vector<double> modes(mode_itr, mode_itr + num_mode_ * num_future_ * PredictedStateDim);
+    std::cerr << "Target " << b << "\n";
+    for (size_t i = 0; i < static_cast<size_t>(num_mode_); i++) {
+      std::cerr << "Mode " << i << "\n";
+      for (size_t j = 0; j < static_cast<size_t>(num_future_); j++) {
+        std::cerr << "Step " << j << "\n";
+        for (size_t k = 0; k < PredictedStateDim; k++) {
+          std::cerr << values[k] << ": "
+                    << modes[i * num_future_ * PredictedStateDim + j * PredictedStateDim + k]
+                    << ",";
+        }
+        std::cerr << "\n";
+      }
+    }
     trajectories.emplace_back(scores, modes, num_mode_, num_future_);
   }
   return true;
