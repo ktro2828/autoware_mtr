@@ -287,6 +287,49 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
       agent_data.state_dim(), d_target_state_.get(), d_in_polyline_.get(),
       d_in_polyline_mask_.get(), d_in_polyline_center_.get(), stream_));
   }
+
+  // Check for NaN or invalid values in d_in_polyline_center_
+  {
+    std::vector<float> host_buffer(num_target_ * max_num_polyline_ * 3);
+    cudaMemcpy(
+      host_buffer.data(), d_in_polyline_center_.get(),
+      num_target_ * max_num_polyline_ * 3 * sizeof(float), cudaMemcpyDeviceToHost);
+    for (const auto & val : host_buffer) {
+      if (std::isnan(val)) {
+        std::cerr << "NaN found in d_in_polyline_center_" << std::endl;
+        return false;
+      }
+    }
+  }
+
+  // Check for NaN or invalid values in d_in_polyline_
+  {
+    std::vector<float> host_buffer(num_target_ * max_num_polyline_ * num_point_ * num_point_attr_);
+    cudaMemcpy(
+      host_buffer.data(), d_in_polyline_.get(),
+      num_target_ * max_num_polyline_ * num_point_ * num_point_attr_ * sizeof(float),
+      cudaMemcpyDeviceToHost);
+    for (const auto & val : host_buffer) {
+      if (std::isnan(val)) {
+        std::cerr << "NaN found in d_in_polyline_" << std::endl;
+        return false;
+      }
+    }
+  }
+
+  // Check for NaN or invalid values in d_intention_point_
+  {
+    std::vector<float> host_buffer(num_target_ * intention_point_.size());
+    cudaMemcpy(
+      host_buffer.data(), d_intention_point_.get(),
+      num_target_ * intention_point_.size() * sizeof(float), cudaMemcpyDeviceToHost);
+    for (const auto & val : host_buffer) {
+      if (std::isnan(val)) {
+        std::cerr << "NaN found in d_intention_point_" << std::endl;
+        return false;
+      }
+    }
+  }
   return true;
 }
 
@@ -297,40 +340,6 @@ bool TrtMTR::postProcess(
     num_target_, num_mode_, num_future_, agent_data.state_dim(), d_target_state_.get(),
     PredictedStateDim, d_out_trajectory_.get(), stream_));
 
-  // {
-  //   auto B = num_target_;
-  //   auto M = num_mode_;
-  //   auto T = num_future_;
-  //   auto D = agent_data.state_dim();
-  //   std::vector<float> host_buffer(B * M * T * D);
-
-  //   // Step 2: Copy data from GPU to host
-  //   cudaMemcpy(
-  //     host_buffer.data(), d_out_trajectory_.get(),
-  //     num_target_ * num_mode_ * num_future_ * PredictedStateDim * sizeof(float),
-  //     cudaMemcpyDeviceToHost);
-
-  //   std::cerr << "Postprocessed output \n";
-  //   std::vector<std::string> values{"x", "y", "xmean", "ymean", "std_dev", "vx", "vy"};
-  //   for (int b = 0; b < B; b++) {
-  //     for (int m = 0; m < M; m++) {
-  //       std::cerr << "{b: " << b;
-  //       std::cerr << ",m: " << m << "\n";
-  //       for (size_t d = 0; d < D; ++d) {
-  //         auto idx = b * M * T * D + m * T * D + d;
-  //         std::cerr << "idx " << idx << "\n";
-  //         auto value = host_buffer[idx];
-  //         if (std::isnan(value)) {
-  //           std::cerr << "NAN detected\n";
-  //           break;
-  //         }
-  //         std::cerr << values[d] << ": " << value << ",";
-  //       }
-
-  //       std::cerr << "}\n";
-  //     }
-  //   }
-  // }
   CHECK_CUDA_ERROR(cudaStreamSynchronize(stream_));
 
   h_out_score_.clear();
