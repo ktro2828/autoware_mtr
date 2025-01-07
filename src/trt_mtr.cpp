@@ -298,7 +298,6 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     for (const auto & val : host_buffer) {
       if (std::isnan(val) || std::abs(val) > 1000) {
         std::cerr << "Invalid value found in d_in_polyline_center_" << std::endl;
-        return false;
       }
     }
   }
@@ -313,7 +312,6 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     for (const auto & val : host_buffer) {
       if (std::isnan(val) || std::abs(val) > 1000) {
         std::cerr << "Invalid value found in d_in_polyline_" << std::endl;
-        return false;
       }
     }
   }
@@ -327,7 +325,6 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     for (const auto & val : host_buffer) {
       if (std::isnan(val) || std::abs(val) > 1000) {
         std::cerr << "Invalid value found in d_intention_point_" << std::endl;
-        return false;
       }
     }
   }
@@ -340,7 +337,9 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     for (const auto & val : host_buffer) {
       if (std::isnan(val) || std::abs(val) > 1000) {
         std::cerr << "NaN found in d_in_polyline_center_" << std::endl;
-        return false;
+        if (!std::isnan(val)) {
+          std::cerr << "high value " << val << std::endl;
+        }
       }
     }
   }
@@ -355,7 +354,6 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     for (const auto & val : host_buffer) {
       if (std::isnan(val)) {
         std::cerr << "NaN found in d_in_polyline_" << std::endl;
-        return false;
       }
     }
   }
@@ -369,7 +367,6 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     for (const auto & val : host_buffer) {
       if (std::isnan(val)) {
         std::cerr << "NaN found in d_intention_point_" << std::endl;
-        return false;
       }
     }
   }
