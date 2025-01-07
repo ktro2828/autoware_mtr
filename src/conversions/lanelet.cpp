@@ -132,7 +132,7 @@ std::optional<PolylineData> LaneletConverter::convert(
         }
       }
     } else if (isCrosswalkLike(lanelet_subtype)) {
-      auto points = fromPolygon(lanelet.polygon3d(), position, distance_threshold);
+      auto points = fromPolygon(lanelet.polygon3d(), label_id, position, distance_threshold);
       insertLanePoints(points, container);
     }
   }
@@ -188,8 +188,8 @@ std::vector<LanePoint> LaneletConverter::fromLinestring(
 }
 
 std::vector<LanePoint> LaneletConverter::fromPolygon(
-  const lanelet::CompoundPolygon3d & polygon, const geometry_msgs::msg::Point & position,
-  double distance_threshold) const noexcept
+  const lanelet::CompoundPolygon3d & polygon, const float label_id,
+  const geometry_msgs::msg::Point & position, double distance_threshold) const noexcept
 {
   if (polygon.size() == 0) {
     return {};
@@ -217,7 +217,8 @@ std::vector<LanePoint> LaneletConverter::fromPolygon(
       dy /= (norm + epsilon);
       dz /= (norm + epsilon);
     }
-    output.emplace_back(itr->x(), itr->y(), itr->z(), dx, dy, dz, 0.0);  // TODO(ktro2828): Label ID
+    output.emplace_back(
+      itr->x(), itr->y(), itr->z(), dx, dy, dz, label_id);  // TODO(ktro2828): Label ID
   }
   return output;
 }
