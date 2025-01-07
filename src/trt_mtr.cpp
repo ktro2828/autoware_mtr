@@ -21,6 +21,7 @@
 #include "preprocess/agent_preprocess_kernel.cuh"
 #include "preprocess/polyline_preprocess_kernel.cuh"
 
+#include <cmath>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -315,8 +316,13 @@ bool TrtMTR::postProcess(
         std::cerr << "{b: " << b;
         std::cerr << ",m: " << m << "\n";
         for (size_t d = 0; d < D; ++d) {
-          std::cerr << values[d] << ": " << host_buffer[b * M * T * D + (m * T + T - 1) * D + d]
-                    << ",";
+          auto idx = b * M * T * D + m * T * D + d;
+          auto value = host_buffer[idx];
+          if (std::isnan(value)) {
+            std::cerr << "NAN detected\n";
+            break;
+          }
+          std::cerr << values[d] << ": " << value << ",";
         }
 
         std::cerr << "}\n";
