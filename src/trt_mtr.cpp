@@ -310,8 +310,9 @@ bool TrtMTR::postProcess(
     for (int b = 0; b < B; b++) {
       for (int m = 0; m < M; m++) {
         std::cerr << "{b: " << b;
-        std::cerr << ",m: " << m << ": \n";
-        for (int t = 0; t < T; ++t) {
+        std::cerr << ",m: " << m << "\n";
+        for (int t = 0; t < T; t = t + 10) {
+          std::cerr << ",t: " << t << ": ";
           for (size_t i = 0; i < D; ++i) {
             std::cerr << values[i] << ": " << host_buffer[b * M * T * D + (m * T + t) * D + i]
                       << ",";
