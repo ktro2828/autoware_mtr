@@ -21,6 +21,9 @@
 #include "preprocess/agent_preprocess_kernel.cuh"
 #include "preprocess/polyline_preprocess_kernel.cuh"
 
+#include <iostream>
+#include <memory>
+#include <string>
 #include <vector>
 
 namespace autoware::mtr
