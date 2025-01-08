@@ -14,6 +14,9 @@
 
 #include "autoware/mtr/conversions/history.hpp"
 
+#include <utility>
+#include <vector>
+
 namespace autoware::mtr
 {
 using adl = autoware::mtr::AgentDimLabels;
