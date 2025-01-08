@@ -27,12 +27,14 @@ class FixedQueue
 {
 public:
   using size_type = typename std::deque<T>::size_type;
+  using reference = typename std::deque<T>::reference;
+  using const_reference = typename std::deque<T>::const_reference;
   using iterator = typename std::deque<T>::iterator;
   using riterator = typename std::reverse_iterator<iterator>;
   using const_iterator = typename std::deque<T>::const_iterator;
   using rconst_iterator = typename std::reverse_iterator<const_iterator>;
 
-  explicit FixedQueue(size_t size) { queue_.resize(size); }
+  explicit FixedQueue(size_type size) : queue_(size) {}
 
   void push_back(const T && t) noexcept
   {
@@ -57,6 +59,12 @@ public:
     queue_.pop_back();
     queue_.push_front(t);
   }
+
+  reference front() noexcept { return queue_.front(); }
+  const_reference front() const noexcept { return queue_.front(); }
+
+  reference back() noexcept { return queue_.back(); }
+  const_reference back() const noexcept { return queue_.back(); }
 
   iterator begin() noexcept { return queue_.begin(); }
   const_iterator begin() const noexcept { return queue_.begin(); }
