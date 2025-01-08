@@ -159,7 +159,7 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     d_trajectory_.get(), agent_data.data_ptr(), sizeof(float) * agent_data.size(),
     cudaMemcpyHostToDevice, stream_));
   CHECK_CUDA_ERROR(cudaMemcpyAsync(
-    d_target_state_.get(), agent_data.target_data_ptr(),
+    d_target_state_.get(), agent_data.current_target_data_ptr(),
     sizeof(float) * num_target_ * agent_data.state_dim(), cudaMemcpyHostToDevice, stream_));
 
   CHECK_CUDA_ERROR(cudaMemcpyAsync(
