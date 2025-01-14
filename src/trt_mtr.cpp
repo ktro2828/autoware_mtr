@@ -223,18 +223,18 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     d_trajectory_.get(), d_in_trajectory_.get(), d_in_trajectory_mask_.get(), d_in_last_pos_.get(),
     stream_));
 
-  auto T = 11;
+  auto T = num_timestamp_;
   // auto D = 12;
   // auto C = 3;
 
-  auto B = 2;
-  auto N = 2;
+  auto B = num_target_;
+  auto N = num_agent_;
   {
     std::vector<float> host_buffer(num_target_ * num_agent_ * 3);
     cudaMemcpy(
       host_buffer.data(), d_in_last_pos_.get(), num_target_ * num_agent_ * 3 * sizeof(float),
       cudaMemcpyDeviceToHost);
-    std::cerr << "Preprocessed lat position \n";
+    std::cerr << "Preprocessed last position \n";
     std::vector<std::string> values{"x", "y", "z"};
     for (int b = 0; b < B; b++) {
       for (int n = 0; n < N; n++) {
@@ -273,6 +273,27 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
           std::cerr << "\n";
         }
         std::cerr << "}\n";
+      }
+    }
+  }
+  // Check for nan in d_in_trajectory_mask_
+  {
+    auto traj_mask = d_in_trajectory_mask_.get();
+    for (int i = 0; i < N * B * T; i++) {
+      if (traj_mask[i] == true) {
+        std::cerr << "True found in d_in_trajectory_mask_ at index " << i << std::endl;
+      }
+    }
+  }
+
+  {
+    std::vector<float> host_buffer(num_target_ * intention_point_.size());
+    cudaMemcpy(
+      host_buffer.data(), d_intention_point_.get(),
+      num_target_ * intention_point_.size() * sizeof(float), cudaMemcpyDeviceToHost);
+    for (const auto & val : host_buffer) {
+      if (std::isnan(val)) {
+        std::cerr << "NaN found in d_intention_point_" << std::endl;
       }
     }
   }
