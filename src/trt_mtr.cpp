@@ -298,26 +298,6 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     }
   }
 
-  // Check for NaN or invalid values in d_in_polyline_
-  {
-    std::vector<float> host_buffer(num_target_ * num_polyline_ * num_point_ * num_point_attr_);
-    cudaMemcpy(
-      host_buffer.data(), d_tmp_polyline_.get(),
-      num_target_ * num_polyline_ * num_point_ * num_point_attr_ * sizeof(float),
-      cudaMemcpyDeviceToHost);
-    std::cerr << "polyline data has " << num_target_ * num_polyline_ * num_point_ * num_point_attr_
-              << " elements\n";
-    size_t count = 0;
-    for (const auto & val : host_buffer) {
-      if (std::isnan(val) || std::abs(val) > 1000) {
-        std::cerr << "NaN found in d_tmp_polyline_ for element" << count++ << std::endl;
-        if (!std::isnan(val)) {
-          std::cerr << "high value " << val << std::endl;
-        }
-      }
-    }
-  }
-
   if (max_num_polyline_ < num_polyline_) {
     std::cerr << "Using topk\n";
     CHECK_CUDA_ERROR(polylinePreprocessWithTopkLauncher(
@@ -331,6 +311,26 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
       num_polyline_, num_point_, polyline_data.state_dim(), d_polyline_.get(), num_target_,
       agent_data.state_dim(), d_target_state_.get(), d_in_polyline_.get(),
       d_in_polyline_mask_.get(), d_in_polyline_center_.get(), stream_));
+  }
+
+  // Check for NaN or invalid values in d_in_polyline_
+  {
+    std::vector<float> host_buffer(num_target_ * num_polyline_ * num_point_ * num_point_attr_);
+    cudaMemcpy(
+      host_buffer.data(), d_tmp_polyline_.get(),
+      num_target_ * num_polyline_ * num_point_ * num_point_attr_ * sizeof(float),
+      cudaMemcpyDeviceToHost);
+    std::cerr << "polyline data has " << num_target_ * num_polyline_ * num_point_ * num_point_attr_
+              << " elements\n";
+    size_t count = 0;
+    for (const auto & val : host_buffer) {
+      if ((std::isnan(val) || std::abs(val) > 1000) && count < 10) {
+        std::cerr << "NaN found in d_tmp_polyline_ for element" << count++ << std::endl;
+        if (!std::isnan(val)) {
+          std::cerr << "high value " << val << std::endl;
+        }
+      }
+    }
   }
 
   // // // Check for NaN or invalid values in d_in_polyline_center_
