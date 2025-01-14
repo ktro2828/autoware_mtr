@@ -277,14 +277,14 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     }
   }
   // Check for nan in d_in_trajectory_mask_
-  {
-    auto traj_mask = d_in_trajectory_mask_.get();
-    for (int i = 0; i < N * B * T; i++) {
-      if (traj_mask[i] == true) {
-        std::cerr << "True found in d_in_trajectory_mask_ at index " << i << std::endl;
-      }
-    }
-  }
+  // {
+  //   auto traj_mask = d_in_trajectory_mask_.get();
+  //   for (int i = 0; i < N * B * T; i++) {
+  //     if (traj_mask[i] == true) {
+  //       std::cerr << "True found in d_in_trajectory_mask_ at index " << i << std::endl;
+  //     }
+  //   }
+  // }
 
   {
     std::vector<float> host_buffer(num_target_ * intention_point_.size());
