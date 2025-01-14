@@ -331,13 +331,15 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
 
   // Check for NaN or invalid values in d_in_polyline_
   {
-    std::vector<float> host_buffer(num_target_ * max_num_polyline_ * num_point_ * num_point_attr_);
+    std::vector<float> host_buffer(
+      num_target_ * max_num_polyline_ * num_point_ * polyline_data.state_dim());
     cudaMemcpy(
       host_buffer.data(), d_in_polyline_.get(),
-      num_target_ * max_num_polyline_ * num_point_ * num_point_attr_ * sizeof(float),
+      num_target_ * max_num_polyline_ * num_point_ * polyline_data.state_dim() * sizeof(float),
       cudaMemcpyDeviceToHost);
     std::cerr << "polyline data has "
-              << num_target_ * max_num_polyline_ * num_point_ * num_point_attr_ << " elements\n";
+              << num_target_ * max_num_polyline_ * num_point_ * polyline_data.state_dim()
+              << " elements\n";
     size_t count = 0;
     for (const auto & val : host_buffer) {
       if (std::isnan(val) || std::abs(val) > 1000) {
