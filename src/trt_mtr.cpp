@@ -312,38 +312,36 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
       d_in_polyline_mask_.get(), d_in_polyline_center_.get(), stream_));
   }
 
-  // // Check for NaN or invalid values in d_in_polyline_center_
-  {
-    std::vector<float> host_buffer(num_target_ * max_num_polyline_ * 3);
-    cudaMemcpy(
-      host_buffer.data(), d_in_polyline_center_.get(),
-      num_target_ * max_num_polyline_ * 3 * sizeof(float), cudaMemcpyDeviceToHost);
+  // // // Check for NaN or invalid values in d_in_polyline_center_
+  // {
+  //   std::vector<float> host_buffer(num_target_ * max_num_polyline_ * 3);
+  //   cudaMemcpy(
+  //     host_buffer.data(), d_in_polyline_center_.get(),
+  //     num_target_ * max_num_polyline_ * 3 * sizeof(float), cudaMemcpyDeviceToHost);
 
-    for (const auto & val : host_buffer) {
-      if (std::isnan(val) || std::abs(val) > 1000) {
-        std::cerr << "NaN found in d_in_polyline_center_" << std::endl;
-        if (!std::isnan(val)) {
-          std::cerr << "high value " << val << std::endl;
-        }
-      }
-    }
-  }
+  //   for (const auto & val : host_buffer) {
+  //     if (std::isnan(val) || std::abs(val) > 1000) {
+  //       std::cerr << "NaN found in d_in_polyline_center_" << std::endl;
+  //       if (!std::isnan(val)) {
+  //         std::cerr << "high value " << val << std::endl;
+  //       }
+  //     }
+  //   }
+  // }
 
   // Check for NaN or invalid values in d_in_polyline_
   {
-    std::vector<float> host_buffer(
-      num_target_ * max_num_polyline_ * num_point_ * polyline_data.state_dim());
+    std::vector<float> host_buffer(num_target_ * num_polyline_ * num_point_ * num_point_attr_);
     cudaMemcpy(
-      host_buffer.data(), d_polyline_.get(),
-      num_target_ * max_num_polyline_ * num_point_ * polyline_data.state_dim() * sizeof(float),
+      host_buffer.data(), d_tmp_polyline_.get(),
+      num_target_ * num_polyline_ * num_point_ * num_point_attr_ * sizeof(float),
       cudaMemcpyDeviceToHost);
-    std::cerr << "polyline data has "
-              << num_target_ * max_num_polyline_ * num_point_ * polyline_data.state_dim()
+    std::cerr << "polyline data has " << num_target_ * num_polyline_ * num_point_ * num_point_attr_
               << " elements\n";
     size_t count = 0;
     for (const auto & val : host_buffer) {
       if (std::isnan(val) || std::abs(val) > 1000) {
-        std::cerr << "NaN found in d_polyline_ for element" << count++ << std::endl;
+        std::cerr << "NaN found in d_tmp_polyline_ for element" << count++ << std::endl;
         if (!std::isnan(val)) {
           std::cerr << "high value " << val << std::endl;
         }
