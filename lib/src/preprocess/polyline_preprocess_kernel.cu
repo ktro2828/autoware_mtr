@@ -112,7 +112,7 @@ __global__ void calculateCenterDistanceKernel(
   }
 
   // calculate polyline center
-  float sumX = 0.0f, sumY = 0.0f;
+  double sumX = 0.0, sumY = 0.0f;
   int numValid = 0;
   for (int p = 0; p < P; ++p) {
     int idx = b * K * P + k * P + p;
@@ -122,8 +122,8 @@ __global__ void calculateCenterDistanceKernel(
       ++numValid;
     }
   }
-  float centerX = sumX / fmaxf(1.0f, numValid);
-  float centerY = sumY / fmaxf(1.0f, numValid);
+  auto centerX = static_cast<float>(sumX / fmaxf(1.0f, numValid));
+  auto centerY = static_cast<float>(sumY / fmaxf(1.0f, numValid));
 
   distance[b * K + k] = hypot(centerX, centerY);
 }
