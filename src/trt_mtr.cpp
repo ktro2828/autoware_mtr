@@ -334,7 +334,7 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     std::vector<float> host_buffer(
       num_target_ * max_num_polyline_ * num_point_ * polyline_data.state_dim());
     cudaMemcpy(
-      host_buffer.data(), d_in_polyline_.get(),
+      host_buffer.data(), d_polyline_.get(),
       num_target_ * max_num_polyline_ * num_point_ * polyline_data.state_dim() * sizeof(float),
       cudaMemcpyDeviceToHost);
     std::cerr << "polyline data has "
@@ -343,7 +343,7 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     size_t count = 0;
     for (const auto & val : host_buffer) {
       if (std::isnan(val) || std::abs(val) > 1000) {
-        std::cerr << "NaN found in d_in_polyline_ for element" << count++ << std::endl;
+        std::cerr << "NaN found in d_polyline_ for element" << count++ << std::endl;
         if (!std::isnan(val)) {
           std::cerr << "high value " << val << std::endl;
         }
