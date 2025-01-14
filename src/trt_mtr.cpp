@@ -340,8 +340,11 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
               << num_target_ * max_num_polyline_ * num_point_ * num_point_attr_ << " elements\n";
     size_t count = 0;
     for (const auto & val : host_buffer) {
-      if (std::isnan(val)) {
+      if (std::isnan(val) || std::abs(val) > 1000) {
         std::cerr << "NaN found in d_in_polyline_ for element" << count++ << std::endl;
+        if (!std::isnan(val)) {
+          std::cerr << "high value " << val << std::endl;
+        }
       }
     }
   }
