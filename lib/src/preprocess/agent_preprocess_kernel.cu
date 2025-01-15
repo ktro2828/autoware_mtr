@@ -33,7 +33,7 @@ __global__ void agentPreprocessKernel(
 
   // === out data ===
   // --- transform trajectory to target centric coords ---
-  const int src_trajectory_idx = (b * T + t) * D;
+  const int src_trajectory_idx = (n * T + t) * D;  // TODO(Daniel): b or n ?
   const float x = in_trajectory[src_trajectory_idx];
   const float y = in_trajectory[src_trajectory_idx + 1];
   const float z = in_trajectory[src_trajectory_idx + 2];
@@ -48,7 +48,9 @@ __global__ void agentPreprocessKernel(
   const float is_valid = in_trajectory[src_trajectory_idx + 11];
 
   // extract targets trajectories
-  const int center_idx = (n * T + T - 1) * D;
+  // const int center_idx = (n * T + T - 1) * D; TODO(Daniel): Is this correct? or is bottom
+  // correct?
+  const int center_idx = (target_index[b] * T + T - 1) * D;
   const float center_x = in_trajectory[center_idx];
   const float center_y = in_trajectory[center_idx + 1];
   const float center_z = in_trajectory[center_idx + 2];
