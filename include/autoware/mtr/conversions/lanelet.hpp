@@ -41,6 +41,9 @@ namespace autoware::mtr
 inline void insertLanePoints(
   const std::vector<LanePoint> & points, std::vector<LanePoint> & container)
 {
+  if (points.empty()) {
+    return;
+  }
   container.reserve(container.size() * 2);
   container.insert(container.end(), points.begin(), points.end());
 }

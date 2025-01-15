@@ -101,7 +101,7 @@ using adl = autoware::mtr::AgentDimLabels;
   std::vector<AgentHistory> agent_centric_histories;
   agent_centric_histories.reserve(histories.size());
   for (const auto & history : histories) {
-    const auto & reference_state =
+    const auto reference_state =
       history.get_latest_state();  // Todo(Daniel): should it be the latest VALID state?
     agent_centric_histories.push_back(getAgentCentricHistory(history, reference_state));
   }

@@ -86,7 +86,7 @@ inline void print_agent_data(const AgentData & agent_data)
 
   const auto & d = agent_data.state_dim();
   const auto & t = agent_data.time_length();
-  const auto target_data_ptr = agent_data.target_data_ptr();
+  const auto target_data_ptr = agent_data.full_target_data_ptr();
   const auto ego_data_ptr = agent_data.ego_data_ptr();
   std::vector<float> ego_data(d * t);
   std::copy(ego_data_ptr, ego_data_ptr + (d * t), ego_data.begin());
