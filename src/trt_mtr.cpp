@@ -59,6 +59,33 @@ bool TrtMTR::doInference(
     return false;
   }
 
+  auto check_values = [&](const std::string & name, const float * ptr, const size_t size) {
+    std::vector<float> host_buffer(size);
+    cudaMemcpy(host_buffer.data(), ptr, size * sizeof(float), cudaMemcpyDeviceToHost);
+    size_t count = 0;
+    for (const auto & val : host_buffer) {
+      if ((std::isnan(val) || std::abs(val) > 1000.0)) {
+        std::cerr << "NaN found in " << name << " for element" << count++ << std::endl;
+        if (!std::isnan(val)) {
+          std::cerr << "high value " << val << std::endl;
+        }
+      }
+    }
+  };
+
+  check_values(
+    "d_in_trajectory_", d_in_trajectory_.get(),
+    num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_);
+  check_values(
+    "d_in_polyline_", d_in_polyline_.get(),
+    num_target_ * max_num_polyline_ * num_point_ * num_point_attr_);
+  check_values(
+    "d_in_polyline_center_", d_in_polyline_center_.get(), num_target_ * max_num_polyline_ * 3);
+  check_values("d_in_last_pos_", d_in_last_pos_.get(), num_target_ * num_agent_ * 3);
+  // check_values("d_target_index_", d_target_index_.get(), num_target_);
+  check_values(
+    "d_intention_point_", d_intention_point_.get(), num_target_ * intention_point_.size());
+
   std::vector<void *> buffer = {d_in_trajectory_.get(),      d_in_trajectory_mask_.get(),
                                 d_in_polyline_.get(),        d_in_polyline_mask_.get(),
                                 d_in_polyline_center_.get(), d_in_last_pos_.get(),

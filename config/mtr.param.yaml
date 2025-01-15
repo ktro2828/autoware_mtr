@@ -8,7 +8,7 @@
       num_future: 80
       max_num_polyline: 768
       max_num_point: 20
-      point_break_distance: 1.0
+      point_break_distance: 0.1
       intention_point_filepath: "$(var data_path)/intention_point.csv"
       num_intention_point_cluster: 64
       polyline_label_path: "$(var data_path)/polyline_label.txt"
