@@ -288,7 +288,17 @@ struct AgentHistory
   bool is_valid_latest() const { return is_valid_latest_; }
 
   // Get the latest agent state at `T`.
-  const AgentState & get_latest_state() const { return *queue_.end(); }
+  const AgentState get_latest_state() const
+  {
+    auto data_array = as_array();
+    const auto start = (max_time_length_ - 1) * AgentStateDim;
+    const auto end = start + AgentStateDim;
+    auto latest_state = AgentState(std::vector<float>(
+      data_array.begin() + static_cast<std::vector<float>::difference_type>(start),
+      data_array.begin() + static_cast<std::vector<float>::difference_type>(end)));
+
+    return latest_state;
+  }
 
   // Get the latest agent state at `T`.
   std::optional<AgentState> get_latest_valid_state() const
@@ -341,11 +351,19 @@ struct AgentData
       }
     }
 
-    target_data_.reserve(num_target_ * state_dim());
+    full_target_data_.reserve(num_target_ * time_length_ * state_dim());
+    for (const auto & idx : target_indices) {
+      for (const auto & v : histories.at(idx).as_array()) {
+        full_target_data_.push_back(v);
+      }
+    }
+
+    target_data_.reserve(state_dim() * state_dim());
     target_label_ids_.reserve(num_target_);
+
     for (const auto & idx : target_indices) {
       target_label_ids_.emplace_back(label_ids.at(idx));
-      for (const auto & v : histories.at(idx).as_array()) {
+      for (const auto & v : histories.at(idx).get_latest_state().as_array()) {
         target_data_.push_back(v);
       }
     }
@@ -404,6 +422,9 @@ struct AgentData
   // Return the address pointer of data array for target agents.
   const float * target_data_ptr() const noexcept { return target_data_.data(); }
 
+  // Return the address pointer of data array for target agents last state.
+  const float * full_target_data_ptr() const noexcept { return full_target_data_.data(); }
+
   // Return the address pointer of data array for ego vehicle.
   const float * ego_data_ptr() const noexcept { return ego_data_.data(); }
 
@@ -418,6 +439,7 @@ private:
   std::vector<float> timestamps_;
   std::vector<float> data_;
   std::vector<float> target_data_;
+  std::vector<float> full_target_data_;
   std::vector<float> ego_data_;
 };
 

@@ -376,7 +376,7 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
   for (size_t idx = 0; idx < histories.size(); ++idx) {
     const auto & history = histories.at(idx);
     if (history.is_valid_latest()) {
-      const auto & state = history.get_latest_state();
+      const auto state = history.get_latest_state();
       geometry_msgs::msg::PoseStamped pose_in_map;
       pose_in_map.pose.position.x = state.x();
       pose_in_map.pose.position.y = state.y();
