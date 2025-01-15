@@ -264,7 +264,6 @@ bool TrtMTR::postProcess(
 
   trajectories.clear();
   trajectories.reserve(num_target_);
-  std::vector<std::string> values{"x", "y", "xmean", "ymean", "std_dev", "vx", "vy"};
 
   for (auto b = 0; b < num_target_; ++b) {
     const auto score_itr = h_out_score_.cbegin() + b * num_mode_;

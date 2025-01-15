@@ -62,7 +62,7 @@ struct AgentState
   {
     position_.x = info_array.at(0);
     position_.y = info_array.at(1);
-    position_.z = 0.0;
+    position_.z = info_array.at(2);
     dimension_.x = info_array.at(3);
     dimension_.y = info_array.at(4);
     dimension_.z = info_array.at(5);
