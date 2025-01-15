@@ -223,144 +223,17 @@ bool TrtMTR::preProcess(const AgentData & agent_data, const PolylineData & polyl
     d_trajectory_.get(), d_in_trajectory_.get(), d_in_trajectory_mask_.get(), d_in_last_pos_.get(),
     stream_));
 
-  auto T = num_timestamp_;
-  // auto D = 12;
-  // auto C = 3;
-
-  auto B = num_target_;
-  auto N = num_agent_;
-  {
-    std::vector<float> host_buffer(num_target_ * num_agent_ * 3);
-    cudaMemcpy(
-      host_buffer.data(), d_in_last_pos_.get(), num_target_ * num_agent_ * 3 * sizeof(float),
-      cudaMemcpyDeviceToHost);
-    std::cerr << "Preprocessed last position \n";
-    std::vector<std::string> values{"x", "y", "z"};
-    for (int b = 0; b < B; b++) {
-      for (int n = 0; n < N; n++) {
-        std::cerr << "{b: " << b;
-        std::cerr << ",n: " << n << ": ";
-        for (int i = 0; i < 3; ++i) {
-          std::cerr << values[i] << ": " << host_buffer[b * N * 3 + n * 3 + i] << ",";
-        }
-        std::cerr << "}\n";
-      }
-    }
-  }
-
-  {
-    std::vector<float> host_buffer(N * B * T * 29);
-
-    // Step 2: Copy data from GPU to host
-    cudaMemcpy(
-      host_buffer.data(), d_in_trajectory_.get(), N * B * T * 29 * sizeof(float),
-      cudaMemcpyDeviceToHost);
-
-    std::cerr << "Preprocessed output \n";
-    std::vector<std::string> values{"x",    "y",  "z",  "L",  "W",  "H",   "O0",  "O1",
-                                    "O2",   "O3", "O4", "T0", "T1", "T2",  "T3",  "T4",
-                                    "T5",   "T6", "T7", "T8", "T9", "T10", "T11", "Yaw0",
-                                    "Yaw1", "Vx", "Vy", "Ax", "Ay"};
-    for (int b = 0; b < B; b++) {
-      for (int n = 0; n < N; n++) {
-        std::cerr << "{b: " << b;
-        std::cerr << ",n: " << n << ": \n";
-        for (int t = 0; t < T; ++t) {
-          for (int i = 0; i < 29; ++i) {
-            std::cerr << values[i] << ": " << host_buffer[b * N * T * 29 + (n * T + t) * 29 + i]
-                      << ",";
-          }
-          std::cerr << "\n";
-        }
-        std::cerr << "}\n";
-      }
-    }
-  }
-  // Check for nan in d_in_trajectory_mask_
-  // {
-  //   auto traj_mask = d_in_trajectory_mask_.get();
-  //   for (int i = 0; i < N * B * T; i++) {
-  //     if (traj_mask[i] == true) {
-  //       std::cerr << "True found in d_in_trajectory_mask_ at index " << i << std::endl;
-  //     }
-  //   }
-  // }
-
-  {
-    std::vector<float> host_buffer(num_target_ * intention_point_.size());
-    cudaMemcpy(
-      host_buffer.data(), d_intention_point_.get(),
-      num_target_ * intention_point_.size() * sizeof(float), cudaMemcpyDeviceToHost);
-    for (const auto & val : host_buffer) {
-      if (std::isnan(val)) {
-        std::cerr << "NaN found in d_intention_point_" << std::endl;
-      }
-    }
-  }
-
   if (max_num_polyline_ < num_polyline_) {
-    std::cerr << "Using topk\n";
     CHECK_CUDA_ERROR(polylinePreprocessWithTopkLauncher(
       max_num_polyline_, num_polyline_, num_point_, polyline_data.state_dim(), d_polyline_.get(),
       num_target_, agent_data.state_dim(), d_target_state_.get(), d_tmp_polyline_.get(),
       d_tmp_polyline_mask_.get(), d_tmp_distance_.get(), d_in_polyline_.get(),
       d_in_polyline_mask_.get(), d_in_polyline_center_.get(), stream_));
   } else {
-    std::cerr << "Using normal\n";
     CHECK_CUDA_ERROR(polylinePreprocessLauncher(
       num_polyline_, num_point_, polyline_data.state_dim(), d_polyline_.get(), num_target_,
       agent_data.state_dim(), d_target_state_.get(), d_in_polyline_.get(),
       d_in_polyline_mask_.get(), d_in_polyline_center_.get(), stream_));
-  }
-
-  // Check for NaN or invalid values in d_in_polyline_
-  {
-    std::vector<float> host_buffer(num_target_ * num_polyline_ * num_point_ * num_point_attr_);
-    cudaMemcpy(
-      host_buffer.data(), d_tmp_polyline_.get(),
-      num_target_ * num_polyline_ * num_point_ * num_point_attr_ * sizeof(float),
-      cudaMemcpyDeviceToHost);
-    std::cerr << "polyline data has " << num_target_ * num_polyline_ * num_point_ * num_point_attr_
-              << " elements\n";
-    size_t count = 0;
-    for (const auto & val : host_buffer) {
-      if ((std::isnan(val) || std::abs(val) > 1000) && count < 10) {
-        std::cerr << "NaN found in d_tmp_polyline_ for element" << count++ << std::endl;
-        if (!std::isnan(val)) {
-          std::cerr << "high value " << val << std::endl;
-        }
-      }
-    }
-  }
-
-  // // // Check for NaN or invalid values in d_in_polyline_center_
-  // {
-  //   std::vector<float> host_buffer(num_target_ * max_num_polyline_ * 3);
-  //   cudaMemcpy(
-  //     host_buffer.data(), d_in_polyline_center_.get(),
-  //     num_target_ * max_num_polyline_ * 3 * sizeof(float), cudaMemcpyDeviceToHost);
-
-  //   for (const auto & val : host_buffer) {
-  //     if (std::isnan(val) || std::abs(val) > 1000) {
-  //       std::cerr << "NaN found in d_in_polyline_center_" << std::endl;
-  //       if (!std::isnan(val)) {
-  //         std::cerr << "high value " << val << std::endl;
-  //       }
-  //     }
-  //   }
-  // }
-
-  // Check for NaN or invalid values in d_intention_point_
-  {
-    std::vector<float> host_buffer(num_target_ * intention_point_.size());
-    cudaMemcpy(
-      host_buffer.data(), d_intention_point_.get(),
-      num_target_ * intention_point_.size() * sizeof(float), cudaMemcpyDeviceToHost);
-    for (const auto & val : host_buffer) {
-      if (std::isnan(val)) {
-        std::cerr << "NaN found in d_intention_point_" << std::endl;
-      }
-    }
   }
   return true;
 }
@@ -397,19 +270,6 @@ bool TrtMTR::postProcess(
     const auto mode_itr =
       h_out_trajectory_.cbegin() + b * num_mode_ * num_future_ * PredictedStateDim;
     std::vector<double> modes(mode_itr, mode_itr + num_mode_ * num_future_ * PredictedStateDim);
-    std::cerr << "Target " << b << "\n";
-    for (size_t i = 0; i < static_cast<size_t>(num_mode_); i++) {
-      std::cerr << "Mode " << i << "\n";
-      for (size_t j = 0; j < static_cast<size_t>(num_future_); j++) {
-        std::cerr << "Step " << j << "\n";
-        for (size_t k = 0; k < PredictedStateDim; k++) {
-          std::cerr << values[k] << ": "
-                    << modes[i * num_future_ * PredictedStateDim + j * PredictedStateDim + k]
-                    << ",";
-        }
-        std::cerr << "\n";
-      }
-    }
     trajectories.emplace_back(scores, modes, num_mode_, num_future_);
   }
   return true;
