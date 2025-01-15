@@ -193,7 +193,6 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
   // For testing purposes, normally pre-processing is done in the cuda side.
   // const auto agent_centric_histories = getAgentCentricHistories(histories);
   AgentData agent_data(histories, ego_index, target_indices, label_ids, relative_timestamps);
-  autoware::mtr::utils::print_agent_data(agent_data);
   std::vector<PredictedTrajectory> trajectories;
   if (!model_ptr_->doInference(agent_data, *polyline_data, trajectories)) {
     RCLCPP_WARN(get_logger(), "Inference failed");
@@ -387,8 +386,6 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
       tf2::doTransform(pose_in_map, pose_in_ego, *map2ego);
 
       const auto distance = std::hypot(pose_in_ego.pose.position.x, pose_in_ego.pose.position.y);
-      std::cerr << "object id and distance " << history.object_id() << " distaNce " << distance
-                << std::endl;
       index_distances.emplace_back(idx, distance);
     }
   }
