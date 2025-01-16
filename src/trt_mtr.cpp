@@ -150,6 +150,9 @@ bool TrtMTR::doInference(
     bool is_different = false;
     for (size_t i = 0; i < buffer.size(); ++i) {
       {
+        if (i > 4) {
+          continue;
+        }
         std::vector<float> host_buffer(1000);
         cudaMemcpy(host_buffer.data(), buffer[i], 1000 * sizeof(float), cudaMemcpyDeviceToHost);
         std::vector<float> host_buffer_prev(1000);
