@@ -104,7 +104,7 @@ __global__ void agentPreprocessKernel(
 
   // === mask ===
   const int mask_idx = b * N * T + n * T + t;
-  out_mask[mask_idx] = is_valid == 1.0f ? true : false;
+  out_mask[mask_idx] = true;
 
   // === last pos ===
   if (t == T - 1) {
