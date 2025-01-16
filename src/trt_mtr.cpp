@@ -147,6 +147,7 @@ bool TrtMTR::doInference(
 
   std::vector<size_t> differences;
   std::vector<std::vector<float>> diff_values(buffer.size(), std::vector<float>());
+  std::vector<std::vector<float>> diff_prev_buffer(previous_buffer_.size(), std::vector<float>());
   std::vector<std::vector<size_t>> diff_indexes(buffer.size(), std::vector<size_t>());
 
   if (!previous_buffer_.empty()) {
@@ -167,15 +168,14 @@ bool TrtMTR::doInference(
             if (host_buffer[j] != host_buffer_prev[j]) {
               is_different = true;
               differences.push_back(i);
-              break;
             }
           } else {
             if (std::abs(host_buffer[j] - host_buffer_prev[j]) > 1e-5) {
               is_different = true;
               differences.push_back(i);
               diff_values[i].push_back(host_buffer[j]);
+              diff_prev_buffer[i].push_back(host_buffer_prev[j]);
               diff_indexes[i].push_back(j);
-              break;
             }
           }
         }
@@ -190,7 +190,8 @@ bool TrtMTR::doInference(
       for (size_t i = 0; i < differences.size(); ++i) {
         std::cerr << "Buffer " << differences[i] << " is different. Values are: ";
         for (size_t j = 0; j < diff_values[differences[i]].size(); ++j) {
-          std::cerr << diff_values[differences[i]][j] << " at index "
+          std::cerr << "current: " << diff_values[differences[i]][j] << "previous"
+                    << diff_prev_buffer[differences[i]][j] << " at index "
                     << diff_indexes[differences[i]][j] << ", ";
         }
         std::cerr << std::endl;
