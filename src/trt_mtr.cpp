@@ -145,16 +145,21 @@ bool TrtMTR::doInference(
                                 d_target_index_.get(),       d_intention_point_.get(),
                                 d_out_trajectory_.get(),     d_out_score_.get()};
 
+  std::vector<size_t> differences;
   if (!previous_buffer_.empty()) {
     bool is_different = false;
     for (size_t i = 0; i < buffer.size(); ++i) {
       if (buffer[i] != previous_buffer_[i]) {
         is_different = true;
-        break;
+        differences.push_back(i);
       }
     }
     if (is_different) {
-      std::cerr << "Buffers are different from the previous call." << std::endl;
+      std::cerr << "Buffers are different from the previous call. buffer size is " << buffer.size()
+                << std::endl;
+      for (const auto & diff : differences) {
+        std::cerr << "Buffer " << diff << " is different." << std::endl;
+      }
     } else {
       std::cerr << "Buffers are the same as the previous call." << std::endl;
     }
