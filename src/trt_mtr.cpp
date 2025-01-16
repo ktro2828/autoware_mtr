@@ -114,15 +114,15 @@ bool TrtMTR::doInference(
   };
 
   fill_with_value(
-    d_in_trajectory_.get(), num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_, 1.0);
+    d_in_trajectory_.get(), num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_, 1.0f);
   // fill_with_value(d_in_trajectory_mask_.get(), num_target_ * num_agent_ * num_timestamp_, 1.0);
   fill_with_value(
-    d_in_polyline_.get(), num_target_ * max_num_polyline_ * num_point_ * num_point_attr_, 1.0);
+    d_in_polyline_.get(), num_target_ * max_num_polyline_ * num_point_ * num_point_attr_, 1.0f);
   // fill_with_value(d_in_polyline_mask_.get(), num_target_ * max_num_polyline_ * num_point_, 1.0);
-  fill_with_value(d_in_polyline_center_.get(), num_target_ * max_num_polyline_ * 3, 1.0);
-  fill_with_value(d_in_last_pos_.get(), num_target_ * num_agent_ * 3, 1.0);
-  fill_with_value(d_target_index_.get(), num_target_, 1.0);
-  fill_with_value(d_intention_point_.get(), num_target_ * intention_point_.size(), 1.0);
+  fill_with_value(d_in_polyline_center_.get(), num_target_ * max_num_polyline_ * 3, 1.0f);
+  fill_with_value(d_in_last_pos_.get(), num_target_ * num_agent_ * 3, 1.0f);
+  fill_with_value(d_target_index_.get(), num_target_, 1.0f);
+  fill_with_value(d_intention_point_.get(), num_target_ * intention_point_.size(), 1.0f);
 
   if (print) {
     check_values(
@@ -144,6 +144,23 @@ bool TrtMTR::doInference(
                                 d_in_polyline_center_.get(), d_in_last_pos_.get(),
                                 d_target_index_.get(),       d_intention_point_.get(),
                                 d_out_trajectory_.get(),     d_out_score_.get()};
+
+  if (!previous_buffer_.empty()) {
+    bool is_different = false;
+    for (size_t i = 0; i < buffer.size(); ++i) {
+      if (buffer[i] != previous_buffer_[i]) {
+        is_different = true;
+        break;
+      }
+    }
+    if (is_different) {
+      std::cerr << "Buffers are different from the previous call." << std::endl;
+    } else {
+      std::cerr << "Buffers are the same as the previous call." << std::endl;
+    }
+  }
+
+  previous_buffer_ = buffer;
 
   if (!builder_->enqueueV2(buffer.data(), stream_, nullptr)) {
     std::cerr << "Fail to do inference" << std::endl;

@@ -190,6 +190,7 @@ private:
   cuda::unique_ptr<float[]> d_out_trajectory_{nullptr};
   std::vector<float> h_out_score_;
   std::vector<float> h_out_trajectory_;
+  std::vector<void *> previous_buffer_;
 };  // class TrtMTR
 }  // namespace autoware::mtr
 #endif  // AUTOWARE__MTR__TRT_MTR_HPP_
