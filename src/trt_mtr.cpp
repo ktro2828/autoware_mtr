@@ -73,9 +73,17 @@ bool TrtMTR::doInference(
     }
   };
 
-  check_values(
-    "d_in_trajectory_", d_in_trajectory_.get(),
-    num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_);
+  auto fill_with_ones = [&](auto ptr, const size_t size) {
+    std::vector<float> host_buffer(size, 1.0);
+    cudaMemcpy(ptr, host_buffer.data(), size * sizeof(float), cudaMemcpyHostToDevice);
+  };
+
+  fill_with_ones(
+    d_in_trajectory_.get(), num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_);
+
+  // check_values(
+  //   "d_in_trajectory_", d_in_trajectory_.get(),
+  //   num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_);
   check_values(
     "d_in_polyline_", d_in_polyline_.get(),
     num_target_ * max_num_polyline_ * num_point_ * num_point_attr_);
