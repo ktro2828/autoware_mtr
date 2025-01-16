@@ -148,6 +148,9 @@ bool TrtMTR::doInference(
     return false;
   }
 
+  fill_with_value(
+    d_out_trajectory_.get(), num_target_ * num_mode_ * num_future_ * PredictedStateDim, 1.0);
+
   if (!postProcess(agent_data, trajectories)) {
     std::cerr << "Fail to postprocess" << std::endl;
     return false;
