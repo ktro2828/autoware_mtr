@@ -115,10 +115,10 @@ bool TrtMTR::doInference(
 
   fill_with_value(
     d_in_trajectory_.get(), num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_, 1.0);
-  fill_with_value(d_in_trajectory_mask_.get(), num_target_ * num_agent_ * num_timestamp_, 1.0);
+  // fill_with_value(d_in_trajectory_mask_.get(), num_target_ * num_agent_ * num_timestamp_, 1.0);
   fill_with_value(
     d_in_polyline_.get(), num_target_ * max_num_polyline_ * num_point_ * num_point_attr_, 1.0);
-  fill_with_value(d_in_polyline_mask_.get(), num_target_ * max_num_polyline_ * num_point_, 1.0);
+  // fill_with_value(d_in_polyline_mask_.get(), num_target_ * max_num_polyline_ * num_point_, 1.0);
   fill_with_value(d_in_polyline_center_.get(), num_target_ * max_num_polyline_ * 3, 1.0);
   fill_with_value(d_in_last_pos_.get(), num_target_ * num_agent_ * 3, 1.0);
   fill_with_value(d_target_index_.get(), num_target_, 1.0);
