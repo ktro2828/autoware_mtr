@@ -123,7 +123,7 @@ bool TrtMTR::doInference(
   fill_with_value(d_in_last_pos_.get(), num_target_ * num_agent_ * 3, 1.0f);
   fill_with_value(d_target_index_.get(), num_target_, 1.0f);
   fill_with_value(d_intention_point_.get(), num_target_ * intention_point_.size(), 1.0f);
-
+  print = true;
   if (print) {
     check_values(
       "d_in_trajectory_", d_in_trajectory_.get(),
@@ -150,7 +150,8 @@ bool TrtMTR::doInference(
   std::vector<std::vector<float>> diff_prev_buffer(previous_buffer_.size(), std::vector<float>());
   std::vector<std::vector<size_t>> diff_indexes(buffer.size(), std::vector<size_t>());
 
-  if (!previous_buffer_.empty()) {
+  print = false;
+  if (!previous_buffer_.empty() && print) {
     bool is_different = false;
     for (size_t i = 0; i < buffer.size(); ++i) {
       {
@@ -190,7 +191,7 @@ bool TrtMTR::doInference(
       for (size_t i = 0; i < differences.size(); ++i) {
         std::cerr << "Buffer " << differences[i] << " is different. Values are: ";
         for (size_t j = 0; j < diff_values[differences[i]].size(); ++j) {
-          std::cerr << "current: " << diff_values[differences[i]][j] << "previous"
+          std::cerr << "current: " << diff_values[differences[i]][j] << " previous"
                     << diff_prev_buffer[differences[i]][j] << " at index "
                     << diff_indexes[differences[i]][j] << ", ";
         }
