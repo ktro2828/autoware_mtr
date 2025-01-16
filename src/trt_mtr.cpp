@@ -157,10 +157,18 @@ bool TrtMTR::doInference(
           host_buffer_prev.data(), previous_buffer_[i], 1000 * sizeof(float),
           cudaMemcpyDeviceToHost);
         for (size_t j = 0; j < 1000; ++j) {
-          if (host_buffer[j] != host_buffer_prev[j]) {
-            is_different = true;
-            differences.push_back(i);
-            break;
+          if (i == 1 || i == 3) {
+            if (host_buffer[j] != host_buffer_prev[j]) {
+              is_different = true;
+              differences.push_back(i);
+              break;
+            }
+          } else {
+            if (std::abs(host_buffer[j] - host_buffer_prev[j]) > 1e-5) {
+              is_different = true;
+              differences.push_back(i);
+              break;
+            }
           }
         }
       }
