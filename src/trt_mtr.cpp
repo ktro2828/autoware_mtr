@@ -149,9 +149,20 @@ bool TrtMTR::doInference(
   if (!previous_buffer_.empty()) {
     bool is_different = false;
     for (size_t i = 0; i < buffer.size(); ++i) {
-      if (buffer[i] != previous_buffer_[i]) {
-        is_different = true;
-        differences.push_back(i);
+      {
+        std::vector<float> host_buffer(1000);
+        cudaMemcpy(host_buffer.data(), buffer[i], 1000 * sizeof(float), cudaMemcpyDeviceToHost);
+        std::vector<float> host_buffer_prev(1000);
+        cudaMemcpy(
+          host_buffer_prev.data(), previous_buffer_[i], 1000 * sizeof(float),
+          cudaMemcpyDeviceToHost);
+        for (size_t j = 0; j < 1000; ++j) {
+          if (host_buffer[j] != host_buffer_prev[j]) {
+            is_different = true;
+            differences.push_back(i);
+            break;
+          }
+        }
       }
     }
     if (is_different) {
