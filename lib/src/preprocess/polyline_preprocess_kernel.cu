@@ -40,7 +40,7 @@ __global__ void transformPolylineKernel(
       isValid = true;
     }
   }
-  outPolylineMask[outIdx] = true;
+  outPolylineMask[outIdx] = isValid;
 
   // initialize output polyline with 0.0
   for (int d = 0; d < PointDim + 2; ++d) {
