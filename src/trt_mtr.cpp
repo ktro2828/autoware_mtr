@@ -60,31 +60,65 @@ bool TrtMTR::doInference(
     return false;
   }
 
-  auto check_values = [&](const std::string & name, const float * ptr, const size_t size) {
-    std::vector<float> host_buffer(size);
-    cudaMemcpy(host_buffer.data(), ptr, size * sizeof(float), cudaMemcpyDeviceToHost);
-    size_t count = 0;
-    for (const auto & val : host_buffer) {
-      if ((std::isnan(val) || std::abs(val) > 1000.0)) {
-        std::cerr << "NaN found in " << name << " for element" << count++ << std::endl;
-        if (!std::isnan(val)) {
-          std::cerr << "high value " << val << std::endl;
+  auto T = num_timestamp_;
+  auto N = num_agent_;
+  auto B = num_target_;
+  auto A = num_agent_attr_;
+  {
+    std::vector<float> host_buffer(N * B * T * A);
+
+    // Step 2: Copy data from GPU to host
+    cudaMemcpy(
+      host_buffer.data(), d_in_trajectory_.get(), N * B * T * A * sizeof(float),
+      cudaMemcpyDeviceToHost);
+
+    std::cerr << "Preprocessed output \n";
+    std::vector<std::string> values{"x",    "y",  "z",  "L",  "W",  "H",   "O0",  "O1",
+                                    "O2",   "O3", "O4", "T0", "T1", "T2",  "T3",  "T4",
+                                    "T5",   "T6", "T7", "T8", "T9", "T10", "T11", "Yaw0",
+                                    "Yaw1", "Vx", "Vy", "Ax", "Ay"};
+    for (int b = 0; b < B; b++) {
+      for (int n = 0; n < N; n++) {
+        std::cerr << "{b: " << b;
+        std::cerr << ",n: " << n << ": \n";
+        for (int t = 0; t < T; ++t) {
+          for (int i = 0; i < A; ++i) {
+            std::cerr << values[i] << ": " << host_buffer[b * N * T * 29 + (n * T + t) * 29 + i]
+                      << ",";
+          }
+          std::cerr << "\n";
         }
+        std::cerr << "}\n";
       }
     }
-  };
+  }
 
-  auto fill_with_ones = [&](auto ptr, const size_t size) {
+  [[maybe_unused]] auto check_values =
+    [&](const std::string & name, const float * ptr, const size_t size) {
+      std::vector<float> host_buffer(size);
+      cudaMemcpy(host_buffer.data(), ptr, size * sizeof(float), cudaMemcpyDeviceToHost);
+      size_t count = 0;
+      for (const auto & val : host_buffer) {
+        if ((std::isnan(val) || std::abs(val) > 1000.0)) {
+          std::cerr << "NaN found in " << name << " for element" << count++ << std::endl;
+          if (!std::isnan(val)) {
+            std::cerr << "high value " << val << std::endl;
+          }
+        }
+      }
+    };
+
+  [[maybe_unused]] auto fill_with_ones = [&](auto ptr, const size_t size) {
     std::vector<float> host_buffer(size, 1.0);
     cudaMemcpy(ptr, host_buffer.data(), size * sizeof(float), cudaMemcpyHostToDevice);
   };
 
-  fill_with_ones(
-    d_in_trajectory_.get(), num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_);
+  // fill_with_ones(
+  //   d_in_trajectory_.get(), num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_);
 
-  // check_values(
-  //   "d_in_trajectory_", d_in_trajectory_.get(),
-  //   num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_);
+  check_values(
+    "d_in_trajectory_", d_in_trajectory_.get(),
+    num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_);
   check_values(
     "d_in_polyline_", d_in_polyline_.get(),
     num_target_ * max_num_polyline_ * num_point_ * num_point_attr_);
