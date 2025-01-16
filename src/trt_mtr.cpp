@@ -59,12 +59,12 @@ bool TrtMTR::doInference(
     std::cerr << "Fail to preprocess" << std::endl;
     return false;
   }
-
-  auto T = num_timestamp_;
-  auto N = num_agent_;
-  auto B = num_target_;
-  auto A = num_agent_attr_;
-  {
+  bool print = false;
+  if (print) {
+    auto T = num_timestamp_;
+    auto N = num_agent_;
+    auto B = num_target_;
+    auto A = num_agent_attr_;
     std::vector<float> host_buffer(N * B * T * A);
 
     // Step 2: Copy data from GPU to host
@@ -114,28 +114,30 @@ bool TrtMTR::doInference(
   };
 
   fill_with_value(
-    d_in_trajectory_.get(), num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_, 0.0);
-  fill_with_value(d_in_trajectory_mask_.get(), num_target_ * num_agent_ * num_timestamp_, 0.0);
+    d_in_trajectory_.get(), num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_, 1.0);
+  fill_with_value(d_in_trajectory_mask_.get(), num_target_ * num_agent_ * num_timestamp_, 1.0);
   fill_with_value(
-    d_in_polyline_.get(), num_target_ * max_num_polyline_ * num_point_ * num_point_attr_, 0.0);
-  fill_with_value(d_in_polyline_mask_.get(), num_target_ * max_num_polyline_ * num_point_, 0.0);
-  fill_with_value(d_in_polyline_center_.get(), num_target_ * max_num_polyline_ * 3, 0.0);
-  fill_with_value(d_in_last_pos_.get(), num_target_ * num_agent_ * 3, 0.0);
-  fill_with_value(d_target_index_.get(), num_target_, 0.0);
-  fill_with_value(d_intention_point_.get(), num_target_ * intention_point_.size(), 0.0);
+    d_in_polyline_.get(), num_target_ * max_num_polyline_ * num_point_ * num_point_attr_, 1.0);
+  fill_with_value(d_in_polyline_mask_.get(), num_target_ * max_num_polyline_ * num_point_, 1.0);
+  fill_with_value(d_in_polyline_center_.get(), num_target_ * max_num_polyline_ * 3, 1.0);
+  fill_with_value(d_in_last_pos_.get(), num_target_ * num_agent_ * 3, 1.0);
+  fill_with_value(d_target_index_.get(), num_target_, 1.0);
+  fill_with_value(d_intention_point_.get(), num_target_ * intention_point_.size(), 1.0);
 
-  // check_values(
-  //   "d_in_trajectory_", d_in_trajectory_.get(),
-  //   num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_);
-  // check_values(
-  //   "d_in_polyline_", d_in_polyline_.get(),
-  //   num_target_ * max_num_polyline_ * num_point_ * num_point_attr_);
-  // check_values(
-  //   "d_in_polyline_center_", d_in_polyline_center_.get(), num_target_ * max_num_polyline_ * 3);
-  // check_values("d_in_last_pos_", d_in_last_pos_.get(), num_target_ * num_agent_ * 3);
-  // // check_values("d_target_index_", d_target_index_.get(), num_target_);
-  // check_values(
-  //   "d_intention_point_", d_intention_point_.get(), num_target_ * intention_point_.size());
+  if (print) {
+    check_values(
+      "d_in_trajectory_", d_in_trajectory_.get(),
+      num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_);
+    check_values(
+      "d_in_polyline_", d_in_polyline_.get(),
+      num_target_ * max_num_polyline_ * num_point_ * num_point_attr_);
+    check_values(
+      "d_in_polyline_center_", d_in_polyline_center_.get(), num_target_ * max_num_polyline_ * 3);
+    check_values("d_in_last_pos_", d_in_last_pos_.get(), num_target_ * num_agent_ * 3);
+    // check_values("d_target_index_", d_target_index_.get(), num_target_);
+    check_values(
+      "d_intention_point_", d_intention_point_.get(), num_target_ * intention_point_.size());
+  }
 
   std::vector<void *> buffer = {d_in_trajectory_.get(),      d_in_trajectory_mask_.get(),
                                 d_in_polyline_.get(),        d_in_polyline_mask_.get(),
@@ -148,8 +150,8 @@ bool TrtMTR::doInference(
     return false;
   }
 
-  fill_with_value(
-    d_out_trajectory_.get(), num_target_ * num_mode_ * num_future_ * PredictedStateDim, 1.0);
+  // fill_with_value(
+  //   d_out_trajectory_.get(), num_target_ * num_mode_ * num_future_ * PredictedStateDim, 1.0);
 
   if (!postProcess(agent_data, trajectories)) {
     std::cerr << "Fail to postprocess" << std::endl;
