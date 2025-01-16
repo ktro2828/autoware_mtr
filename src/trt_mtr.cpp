@@ -146,6 +146,9 @@ bool TrtMTR::doInference(
                                 d_out_trajectory_.get(),     d_out_score_.get()};
 
   std::vector<size_t> differences;
+  std::vector<std::vector<float>> diff_values(buffer.size(), std::vector<float>());
+  std::vector<std::vector<size_t>> diff_indexes(buffer.size(), std::vector<size_t>());
+
   if (!previous_buffer_.empty()) {
     bool is_different = false;
     for (size_t i = 0; i < buffer.size(); ++i) {
@@ -170,6 +173,8 @@ bool TrtMTR::doInference(
             if (std::abs(host_buffer[j] - host_buffer_prev[j]) > 1e-5) {
               is_different = true;
               differences.push_back(i);
+              diff_values[i].push_back(host_buffer[j]);
+              diff_indexes[i].push_back(j);
               break;
             }
           }
@@ -179,8 +184,16 @@ bool TrtMTR::doInference(
     if (is_different) {
       std::cerr << "Buffers are different from the previous call. buffer size is " << buffer.size()
                 << std::endl;
-      for (const auto & diff : differences) {
-        std::cerr << "Buffer " << diff << " is different." << std::endl;
+      // for (const auto & diff : differences) {
+      //   std::cerr << "Buffer " << diff << " is different." << std::endl;
+      // }
+      for (size_t i = 0; i < differences.size(); ++i) {
+        std::cerr << "Buffer " << differences[i] << " is different. Values are: ";
+        for (size_t j = 0; j < diff_values[differences[i]].size(); ++j) {
+          std::cerr << diff_values[differences[i]][j] << " at index "
+                    << diff_indexes[differences[i]][j] << ", ";
+        }
+        std::cerr << std::endl;
       }
     } else {
       std::cerr << "Buffers are the same as the previous call." << std::endl;
