@@ -56,7 +56,23 @@ enum AgentDimLabels {
 struct AgentState
 {
   // Construct a new instance filling all elements by `0.0f`.
-  AgentState() {}
+  AgentState() = default;
+
+  explicit AgentState(const std::vector<float> & info_array)
+  {
+    position_.x = info_array.at(0);
+    position_.y = info_array.at(1);
+    position_.z = info_array.at(2);
+    dimension_.x = info_array.at(3);
+    dimension_.y = info_array.at(4);
+    dimension_.z = info_array.at(5);
+    yaw_ = info_array.at(6);
+    velocity_.x = info_array.at(7);
+    velocity_.y = info_array.at(8);
+    acceleration_.x = info_array.at(9);
+    acceleration_.y = info_array.at(10);
+    is_valid_ = info_array.at(11);
+  }
 
   /**
    * @brief Construct a new instance with specified values.
@@ -121,7 +137,7 @@ struct AgentState
   float ay() const { return acceleration_.y; }
 
   // Return `true` if the value is `1.0`.
-  bool is_valid() const { return is_valid_ == 1.0; }
+  bool is_valid() const { return is_valid_ > std::numeric_limits<float>::epsilon(); }
 
   // Return the state attribute as an array.
   std::array<float, AgentStateDim> as_array() const noexcept
@@ -153,16 +169,45 @@ struct AgentHistory
    * @param max_time_length History length.
    */
   AgentHistory(
-    const AgentState & state, const std::string & object_id, const size_t label_id,
+    const std::vector<float> & state_array, const std::string & object_id, const size_t label_id,
     const double current_time, const size_t max_time_length)
-  : queue_(max_time_length),
-    object_id_(object_id),
+  : object_id_(object_id),
     label_id_(label_id),
     latest_time_(current_time),
     max_time_length_(max_time_length)
   {
-    queue_.push_back(state);
+    queue_.set_size(max_time_length);
+    for (size_t i = 0; i < max_time_length; ++i) {
+      const auto start = i * AgentStateDim;
+      const auto end = start + AgentStateDim;
+      const AgentState state(std::vector<float>(
+        state_array.begin() + static_cast<std::vector<float>::difference_type>(start),
+        state_array.begin() + static_cast<std::vector<float>::difference_type>(end)));
+      queue_.push_back(state);
+      is_valid_latest_ = state.is_valid();
+    }
   }
+
+  AgentHistory(
+    const AgentState & state, const std::string & object_id, const size_t label_id,
+    const double current_time, const size_t max_time_length)
+  : object_id_(object_id),
+    label_id_(label_id),
+    latest_time_(current_time),
+    max_time_length_(max_time_length)
+  {
+    queue_.set_size(max_time_length);
+    queue_.push_back(state);
+    is_valid_latest_ = state.is_valid();
+  }
+
+  ~AgentHistory() = default;
+
+  AgentHistory(const AgentHistory & other) = default;
+  AgentHistory & operator=(const AgentHistory & other) = delete;
+
+  AgentHistory(AgentHistory && other) noexcept = default;
+  AgentHistory & operator=(AgentHistory && other) noexcept = delete;
 
   // Return the history time length `T`.
   size_t length() const { return max_time_length_; }
@@ -240,10 +285,21 @@ struct AgentHistory
    * @return true If the end of element is 1.0f.
    * @return false Otherwise.
    */
-  bool is_valid_latest() const { return get_latest_state().is_valid(); }
+  bool is_valid_latest() const { return is_valid_latest_; }
 
   // Get the latest agent state at `T`.
   const AgentState & get_latest_state() const { return queue_.back(); }
+  // const AgentState get_latest_state() const
+  // {
+  //   auto data_array = as_array();
+  //   const auto start = (max_time_length_ - 1) * AgentStateDim;
+  //   const auto end = start + AgentStateDim;
+  //   auto latest_state = AgentState(std::vector<float>(
+  //     data_array.begin() + static_cast<std::vector<float>::difference_type>(start),
+  //     data_array.begin() + static_cast<std::vector<float>::difference_type>(end)));
+
+  //   return latest_state;
+  // }
 
   // Get the latest agent state at `T`.
   std::optional<AgentState> get_latest_valid_state() const
@@ -255,11 +311,12 @@ struct AgentHistory
   }
 
 private:
-  FixedQueue<AgentState> queue_;
   const std::string object_id_;
   const size_t label_id_;
   double latest_time_;
   const size_t max_time_length_;
+  bool is_valid_latest_{false};
+  FixedQueue<AgentState> queue_;
 };
 
 /**
@@ -296,11 +353,21 @@ struct AgentData
     }
 
     current_target_data_.reserve(num_target_ * state_dim());  // (B, D)
+    full_target_data_.reserve(num_target_ * time_length_ * state_dim());
+    for (const auto & idx : target_indices) {
+      for (const auto & v : histories.at(idx).as_array()) {
+        full_target_data_.push_back(v);
+      }
+    }
+
+    target_data_.reserve(state_dim() * state_dim());
     target_label_ids_.reserve(num_target_);
+
     for (const auto & idx : target_indices) {
       target_label_ids_.emplace_back(label_ids.at(idx));
       for (const auto & v : histories.at(idx).get_latest_state().as_array()) {
         current_target_data_.push_back(v);
+        target_data_.push_back(v);
       }
     }
 
@@ -358,6 +425,9 @@ struct AgentData
   // Return the address pointer of data array for target agents.
   const float * current_target_data_ptr() const noexcept { return current_target_data_.data(); }
 
+  // Return the address pointer of data array for target agents last state.
+  const float * full_target_data_ptr() const noexcept { return full_target_data_.data(); }
+
   // Return the address pointer of data array for ego vehicle.
   const float * ego_data_ptr() const noexcept { return ego_data_.data(); }
 
@@ -372,6 +442,8 @@ private:
   std::vector<float> timestamps_;
   std::vector<float> data_;
   std::vector<float> current_target_data_;
+  std::vector<float> target_data_;
+  std::vector<float> full_target_data_;
   std::vector<float> ego_data_;
 };
 

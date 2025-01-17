@@ -18,20 +18,51 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <string>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 
 namespace autoware::mtr
 {
 constexpr size_t PointStateDim = 7;
 
+enum class MapType {
+  ROADWAY = 0,
+  BUS_LANE = 1,
+  BIKE_LANE = 2,
+  DASH_SOLID = 3,
+  DASHED = 4,
+  DOUBLE_DASH = 5,
+  SOLID = 6,
+  DOUBLE_SOLID = 7,
+  SOLID_DASH = 8,
+  CROSSWALK = 9,
+  UNKNOWN = 10
+};
+
+const std::array<std::string, 4> T4_LANE = {"road", "highway", "road_shoulder", "bicycle_lane"};
+const std::array<std::string, 4> T4_ROADLINE = {"dashed", "solid", "dashed_dashed", "virtual"};
+const std::array<std::string, 1> T4_ROADEDGE = {"road_border"};
+
+const std::unordered_map<std::string, MapType> g_map_type_mapping = {
+  {"road", MapType::ROADWAY},
+  {"highway", MapType::ROADWAY},
+  {"road_shoulder", MapType::ROADWAY},
+  {"bicycle_lane", MapType::BIKE_LANE},
+  {"dashed", MapType::DASHED},
+  {"solid", MapType::SOLID},
+  {"dashed_dashed", MapType::DOUBLE_DASH},
+  {"virtual", MapType::UNKNOWN},
+  {"road_border", MapType::SOLID},
+  {"crosswalk", MapType::CROSSWALK},
+  {"unknown", MapType::UNKNOWN},
+};
+
 enum PolylineLabel { LANE = 0, ROAD_LINE = 1, ROAD_EDGE = 2, CROSSWALK = 3 };
 
 struct LanePoint
 {
-  // Construct a new instance filling all elements by `0.0f`.
-  LanePoint() : data_({0.0f}) {}
-
   /**
    * @brief Construct a new instance with specified values.
    *
@@ -46,12 +77,34 @@ struct LanePoint
   LanePoint(
     const float x, const float y, const float z, const float dx, const float dy, const float dz,
     const float label)
-  : data_({x, y, z, dx, dy, dz, label}), x_(x), y_(y), z_(z), label_(label)
+  : x_(x), y_(y), z_(z), label_(label), data_({x, y, z, dx, dy, dz, label})
+  {
+  }
+
+  /**
+   * @brief Construct a new instance with specified values.
+   *
+   * @param x X position.
+   * @param y Y position.
+   * @param z Z position.
+   * @param dx Normalized delta x.
+   * @param dy Normalized delta y.
+   * @param dz Normalized delta z.
+   * @param label Label.
+   */
+  LanePoint(
+    const float x, const float y, const float z, const float dx, const float dy, const float dz,
+    const std::string & label)
+  : x_(x),
+    y_(y),
+    z_(z),
+    label_(static_cast<float>(g_map_type_mapping.at(label))),
+    data_({x, y, z, dx, dy, dz, label_})
   {
   }
 
   // Construct a new instance filling all elements by `0.0f`.
-  static LanePoint empty() noexcept { return LanePoint(); }
+  static LanePoint empty() noexcept { return {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; }
 
   // Return the point state dimensions `D`.
   static size_t dim() { return PointStateDim; }
@@ -83,8 +136,8 @@ struct LanePoint
   const float * data_ptr() const noexcept { return data_.data(); }
 
 private:
-  std::array<float, PointStateDim> data_;
   float x_{0.0f}, y_{0.0f}, z_{0.0f}, label_{0.0f};
+  std::array<float, PointStateDim> data_;
 };
 
 struct PolylineData
@@ -112,23 +165,24 @@ struct PolylineData
     for (std::size_t i = 0; i < points.size(); ++i) {
       auto & cur_point = points.at(i);
 
-      if (i == 0) {
+      if (i == 0 || point_cnt >= num_point_) {
         addNewPolyline(cur_point, point_cnt);
         continue;
       }
 
-      if (point_cnt >= num_point_) {
-        addNewPolyline(cur_point, point_cnt);
-      } else if (const auto & prev_point = points.at(i - 1);
-                 cur_point.distance(prev_point) >= distance_threshold_ ||
-                 cur_point.label() != prev_point.label()) {
-        if (point_cnt < num_point_) {
-          addEmptyPoints(point_cnt);
-        }
-        addNewPolyline(cur_point, point_cnt);
-      } else {
+      const auto & prev_point = points.at(i - 1);
+      const bool is_new_polyline = cur_point.distance(prev_point) >= distance_threshold_ ||
+                                   cur_point.label() != prev_point.label();
+
+      if (!is_new_polyline) {
         addPoint(cur_point, point_cnt);
+        continue;
       }
+
+      if (point_cnt < num_point_) {
+        addEmptyPoints(point_cnt);
+      }
+      addNewPolyline(cur_point, point_cnt);
     }
     addEmptyPoints(point_cnt);
 
@@ -202,10 +256,9 @@ private:
    */
   void addEmptyPoints(size_t & point_cnt)
   {
-    const auto s = LanePoint::empty().data_ptr();
     for (std::size_t n = point_cnt; n < num_point_; ++n) {
       for (std::size_t d = 0; d < state_dim(); ++d) {
-        data_.push_back(*(s + d));
+        data_.push_back(0.0);
       }
     }
     point_cnt = num_point_;
@@ -227,9 +280,9 @@ private:
   }
 
   size_t num_polyline_;
-  size_t num_point_;
+  size_t num_point_{};
   std::vector<float> data_;
-  const float distance_threshold_;
+  const float distance_threshold_{};
 };
 }  // namespace autoware::mtr
 #endif  // AUTOWARE__MTR__POLYLINE_HPP_

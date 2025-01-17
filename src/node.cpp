@@ -18,6 +18,7 @@
 #include "autoware/mtr/conversions/history.hpp"
 #include "autoware/mtr/conversions/lanelet.hpp"
 #include "autoware/mtr/fixed_queue.hpp"
+#include "autoware/mtr/utils.hpp"
 
 #include <lanelet2_extension/utility/message_conversion.hpp>
 #include <rclcpp/logging.hpp>
@@ -41,7 +42,7 @@ namespace autoware::mtr
 {
 // TODO(ktro2828): use a parameter
 constexpr double TIME_THRESHOLD = 1.0;
-constexpr size_t MAX_NUM_TARGET = 1;
+constexpr size_t NUM_TARGET = 2;
 constexpr double POLYLINE_DISTANCE_THRESHOLD = 100.0;
 namespace
 {
@@ -166,7 +167,8 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
   int tmp_ego_index = -1;
   for (const auto & [object_id, history] : agent_history_map_) {
     object_ids.emplace_back(object_id);
-    histories.emplace_back(history);
+    histories.emplace_back(
+      history.as_array(), object_id, history.label_id(), current_time, history.length());
     label_ids.emplace_back(history.label_id());
     if (object_id == EGO_ID) {
       tmp_ego_index = histories.size() - 1;
@@ -179,8 +181,10 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
   }
 
   const auto target_indices = extractTargetAgent(histories);
-  if (target_indices.empty()) {
-    RCLCPP_WARN(get_logger(), "No target agents");
+  if (target_indices.size() != NUM_TARGET) {
+    RCLCPP_WARN(
+      get_logger(), "Found target size mismatch, %zu targets were extracted, but %zu were expected",
+      target_indices.size(), NUM_TARGET);
     return;
   }
 
@@ -189,7 +193,6 @@ void MTRNode::callback(const TrackedObjects::ConstSharedPtr object_msg)
   // For testing purposes, normally pre-processing is done in the cuda side.
   // const auto agent_centric_histories = getAgentCentricHistories(histories);
   AgentData agent_data(histories, ego_index, target_indices, label_ids, relative_timestamps);
-
   std::vector<PredictedTrajectory> trajectories;
   if (!model_ptr_->doInference(agent_data, *polyline_data, trajectories)) {
     RCLCPP_WARN(get_logger(), "Inference failed");
@@ -257,11 +260,17 @@ std::optional<TrackedObject> MTRNode::getLatestEgo()
 
   // Shape
   {
-    const auto & ego_max_long_offset = vehicle_info_.max_longitudinal_offset_m;
-    const auto & ego_rear_overhang = vehicle_info_.vehicle_height_m;
-    const auto & ego_length = vehicle_info_.vehicle_length_m;
-    const auto & ego_width = vehicle_info_.vehicle_width_m;
-    const auto & ego_height = vehicle_info_.vehicle_height_m;
+    // const auto & ego_max_long_offset = vehicle_info_.max_longitudinal_offset_m;
+    // const auto & ego_rear_overhang = vehicle_info_.vehicle_height_m;
+    // const auto & ego_length = vehicle_info_.vehicle_length_m;
+    // const auto & ego_width = vehicle_info_.vehicle_width_m;
+    // const auto & ego_height = vehicle_info_.vehicle_height_m;
+
+    const auto ego_max_long_offset = 2.9;
+    const auto ego_rear_overhang = 1.1;
+    const auto ego_length = 4.0;
+    const auto ego_width = 2.0;
+    const auto ego_height = 2.0;
 
     autoware_perception_msgs::msg::Shape shape;
     shape.type = autoware_perception_msgs::msg::Shape::BOUNDING_BOX;
@@ -310,6 +319,19 @@ void MTRNode::updateAgentHistory(
   const TrackedObject & ego_msg)
 {
   std::vector<std::string> observed_ids;
+
+  // ego vehicle
+  observed_ids.emplace_back(EGO_ID);
+  object_msg_map_.insert_or_assign(EGO_ID, ego_msg);
+
+  const auto ego = createAgentState(ego_msg, true);
+  if (agent_history_map_.count(EGO_ID) == 0) {
+    AgentHistory history(ego, EGO_ID, AgentLabel::VEHICLE, current_time, config_ptr_->num_past);
+    agent_history_map_.emplace(EGO_ID, history);
+  } else {
+    agent_history_map_.at(EGO_ID).update(current_time, ego);
+  }
+
   // other agents
   for (const auto & object : objects_msg->objects) {
     auto label_index = getLabelIndex(object);
@@ -328,18 +350,6 @@ void MTRNode::updateAgentHistory(
     } else {
       agent_history_map_.at(object_id).update(current_time, state);
     }
-  }
-
-  // ego vehicle
-  observed_ids.emplace_back(EGO_ID);
-  object_msg_map_.insert_or_assign(EGO_ID, ego_msg);
-
-  const auto ego = createAgentState(ego_msg, true);
-  if (agent_history_map_.count(EGO_ID) == 0) {
-    AgentHistory history(ego, EGO_ID, AgentLabel::VEHICLE, current_time, config_ptr_->num_past);
-    agent_history_map_.emplace(EGO_ID, history);
-  } else {
-    agent_history_map_.at(EGO_ID).update(current_time, ego);
   }
 
   // update unobserved histories with empty
@@ -364,8 +374,8 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
   std::vector<std::pair<size_t, double>> index_distances;
   for (size_t idx = 0; idx < histories.size(); ++idx) {
     const auto & history = histories.at(idx);
-    if (history.is_valid_latest() && history.object_id() != EGO_ID) {
-      const auto & state = history.get_latest_state();
+    if (history.is_valid_latest()) {
+      const auto state = history.get_latest_state();
       geometry_msgs::msg::PoseStamped pose_in_map;
       pose_in_map.pose.position.x = state.x();
       pose_in_map.pose.position.y = state.y();
@@ -388,7 +398,7 @@ std::vector<size_t> MTRNode::extractTargetAgent(const std::vector<AgentHistory> 
   std::vector<size_t> target_indices;
   for (const auto & [idx, _] : index_distances) {
     target_indices.emplace_back(idx);
-    if (MAX_NUM_TARGET <= target_indices.size()) {
+    if (NUM_TARGET <= target_indices.size()) {
       break;
     }
   }

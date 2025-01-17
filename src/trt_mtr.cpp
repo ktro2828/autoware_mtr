@@ -21,6 +21,8 @@
 #include "preprocess/agent_preprocess_kernel.cuh"
 #include "preprocess/polyline_preprocess_kernel.cuh"
 
+#include <cmath>
+#include <cstddef>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -93,34 +95,76 @@ void TrtMTR::initCudaPtr(const AgentData & agent_data, const PolylineData & poly
 
   // source data
   d_target_index_ = cuda::make_unique<int[]>(num_target_);
+  cudaMemset(d_target_index_.get(), 0, num_target_ * sizeof(int));
+
   d_label_index_ = cuda::make_unique<int[]>(num_agent_);
+  cudaMemset(d_label_index_.get(), 0, num_agent_ * sizeof(int));
+
   d_timestamp_ = cuda::make_unique<float[]>(num_timestamp_);
+  cudaMemset(d_timestamp_.get(), 0.0, num_timestamp_ * sizeof(float));
+
   d_trajectory_ = cuda::make_unique<float[]>(agent_data.size());
+  cudaMemset(d_trajectory_.get(), 0.0, agent_data.size() * sizeof(float));
+
   d_target_state_ = cuda::make_unique<float[]>(num_target_ * agent_data.state_dim());
+  cudaMemset(d_target_state_.get(), 0.0, num_target_ * agent_data.state_dim() * sizeof(float));
+
   d_intention_point_ = cuda::make_unique<float[]>(num_target_ * intention_point_.size());
+  cudaMemset(d_intention_point_.get(), 0.0, num_target_ * intention_point_.size() * sizeof(float));
+
   d_polyline_ = cuda::make_unique<float[]>(polyline_data.size());
+  cudaMemset(d_polyline_.get(), 0.0, polyline_data.size() * sizeof(float));
 
   // preprocessed input
   d_in_trajectory_ =
     cuda::make_unique<float[]>(num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_);
+  cudaMemset(
+    d_in_trajectory_.get(), 0.0,
+    num_target_ * num_agent_ * num_timestamp_ * num_agent_attr_ * sizeof(float));
   d_in_trajectory_mask_ = cuda::make_unique<bool[]>(num_target_ * num_agent_ * num_timestamp_);
+  cudaMemset(
+    d_in_trajectory_mask_.get(), false, num_target_ * num_agent_ * num_timestamp_ * sizeof(bool));
+
   d_in_last_pos_ = cuda::make_unique<float[]>(num_target_ * num_agent_ * 3);
+  cudaMemset(d_in_last_pos_.get(), 0.0, num_target_ * num_agent_ * 3 * sizeof(float));
+
   d_in_polyline_ =
     cuda::make_unique<float[]>(num_target_ * max_num_polyline_ * num_point_ * num_point_attr_);
+  cudaMemset(
+    d_in_polyline_.get(), 0.0,
+    num_target_ * max_num_polyline_ * num_point_ * num_point_attr_ * sizeof(float));
+
   d_in_polyline_mask_ = cuda::make_unique<bool[]>(num_target_ * max_num_polyline_ * num_point_);
+  cudaMemset(
+    d_in_polyline_.get(), false, num_target_ * max_num_polyline_ * num_point_ * sizeof(bool));
+
   d_in_polyline_center_ = cuda::make_unique<float[]>(num_target_ * max_num_polyline_ * 3);
+  cudaMemset(d_in_polyline_.get(), 0.0, num_target_ * max_num_polyline_ * 3 * sizeof(float));
 
   if (max_num_polyline_ < num_polyline_) {
     d_tmp_polyline_ =
       cuda::make_unique<float[]>(num_target_ * num_polyline_ * num_point_ * num_point_attr_);
+    cudaMemset(
+      d_tmp_polyline_.get(), 0.0,
+      num_target_ * num_polyline_ * num_point_ * num_point_attr_ * sizeof(float));
+
     d_tmp_polyline_mask_ = cuda::make_unique<bool[]>(num_target_ * num_polyline_ * num_point_);
+    cudaMemset(
+      d_tmp_polyline_mask_.get(), false, num_target_ * num_polyline_ * num_point_ * sizeof(bool));
+
     d_tmp_distance_ = cuda::make_unique<float[]>(num_target_ * num_polyline_);
+    cudaMemset(d_tmp_distance_.get(), 0.0, num_target_ * num_polyline_ * sizeof(float));
   }
 
   // outputs
   d_out_score_ = cuda::make_unique<float[]>(num_target_ * num_mode_);
+  cudaMemset(d_out_score_.get(), 0.0, num_target_ * num_mode_ * sizeof(float));
+
   d_out_trajectory_ =
     cuda::make_unique<float[]>(num_target_ * num_mode_ * num_future_ * PredictedStateDim);
+  cudaMemset(
+    d_out_trajectory_.get(), 0.0,
+    num_target_ * num_mode_ * num_future_ * PredictedStateDim * sizeof(float));
 
   if (builder_->isDynamic()) {
     // trajectory: (B, N, T, Da)

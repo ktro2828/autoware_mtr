@@ -41,6 +41,9 @@ namespace autoware::mtr
 inline void insertLanePoints(
   const std::vector<LanePoint> & points, std::vector<LanePoint> & container)
 {
+  if (points.empty()) {
+    return;
+  }
   container.reserve(container.size() * 2);
   container.insert(container.end(), points.begin(), points.end());
 }
@@ -209,8 +212,8 @@ private:
    * @return std::vector<LanePoint>
    */
   std::vector<LanePoint> fromLinestring(
-    const lanelet::ConstLineString3d & linestring, const geometry_msgs::msg::Point & position,
-    double distance_threshold) const noexcept;
+    const lanelet::ConstLineString3d & linestring, const float polyline_label,
+    const geometry_msgs::msg::Point & position, double distance_threshold) const noexcept;
 
   /**
    * @brief Convert a polygon to the set of polylines.
@@ -221,8 +224,8 @@ private:
    * @return std::vector<LanePoint>
    */
   std::vector<LanePoint> fromPolygon(
-    const lanelet::CompoundPolygon3d & polygon, const geometry_msgs::msg::Point & position,
-    double distance_threshold) const noexcept;
+    const lanelet::CompoundPolygon3d & polygon, const float label_id,
+    const geometry_msgs::msg::Point & position, double distance_threshold) const noexcept;
 
   lanelet::LaneletMapConstPtr lanelet_map_ptr_;  //!< Pointer of lanelet map.
   size_t max_num_polyline_;                      //!< The max number of polylines.
